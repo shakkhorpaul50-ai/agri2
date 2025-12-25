@@ -1,0 +1,115 @@
+
+import React from 'react';
+import CommentSection from '../components/CommentSection';
+
+interface HomeProps {
+  onGetStarted: () => void;
+}
+
+const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
+  const features = [
+    { icon: 'fa-microchip', title: 'IoT Sensor Network', desc: 'Precision sensors monitoring every inch of your soil.' },
+    { icon: 'fa-chart-line', title: 'Real-time Analysis', desc: 'Watch your field health live through interactive dashboards.' },
+    { icon: 'fa-robot', title: 'Smart Crop Analysis', desc: 'AI-powered crop recommendations tailored for your soil.' },
+    { icon: 'fa-droplet', title: 'Water Optimizer', desc: 'Smart irrigation scheduling based on moisture and weather.' },
+    { icon: 'fa-flask', title: 'Fertilizer Management', desc: 'NPK data tracking to optimize your soil nutrient balance.' },
+    { icon: 'fa-cloud-sun', title: 'Weather Integration', desc: 'Hyper-local weather forecasts and extreme conditions alerts.' },
+  ];
+
+  return (
+    <div className="space-y-20 pb-20">
+      {/* Hero Section */}
+      <section className="relative h-[650px] flex items-center overflow-hidden">
+        <div className="absolute inset-0 bg-cover bg-center z-0" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1592982537447-7440770cbfc9?q=80&w=2000&auto=format&fit=crop)' }}>
+          <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[2px]"></div>
+        </div>
+        
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left">
+          <div className="max-w-3xl">
+            <h1 className="text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6">
+              The Future of <span className="text-emerald-400 underline decoration-emerald-500/30">Yield Optimization</span> is Here
+            </h1>
+            <p className="text-xl text-emerald-50 mb-10 leading-relaxed max-w-2xl opacity-90">
+              Transform your farm with high-precision IoT telemetry and AI insights. Agricare bridges the gap between traditional wisdom and modern data science.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-5 justify-center sm:justify-start">
+              <button 
+                onClick={onGetStarted}
+                className="px-10 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-xl shadow-2xl shadow-emerald-900/50 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3"
+              >
+                <i className="fas fa-rocket"></i> Start Free Trial
+              </button>
+              <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20 flex items-center gap-4 text-white">
+                <i className="fas fa-mobile-screen-button text-2xl"></i>
+                <div className="text-left">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Available as PWA</div>
+                  <div className="text-sm font-medium">Add to Home Screen</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust Banner */}
+      <section className="max-w-7xl mx-auto px-4 py-12 flex flex-wrap justify-center items-center gap-12 opacity-40 grayscale hover:grayscale-0 transition-all">
+        <div className="text-2xl font-black text-slate-400">AGRO-SYNC</div>
+        <div className="text-2xl font-black text-slate-400">FARM-LYNX</div>
+        <div className="text-2xl font-black text-slate-400">ECO-GROW</div>
+        <div className="text-2xl font-black text-slate-400">TERRA-DATA</div>
+      </section>
+
+      {/* Quick App Access Guide */}
+      <section className="max-w-5xl mx-auto px-4">
+        <div className="bg-emerald-50 rounded-[3rem] p-10 border border-emerald-100 flex flex-col md:flex-row items-center gap-10">
+          <div className="flex-1">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">No App Store Required</h2>
+            <p className="text-slate-600 leading-relaxed mb-6">
+              Agricare uses Progressive Web App (PWA) technology. To "download" it, simply visit this site on your mobile browser and select <strong>"Add to Home Screen"</strong>. It works offline and provides real-time push notifications.
+            </p>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
+                <i className="fas fa-check-circle"></i> Instant Updates
+              </div>
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
+                <i className="fas fa-check-circle"></i> Low Data Usage
+              </div>
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
+                <i className="fas fa-check-circle"></i> Cross-Platform
+              </div>
+            </div>
+          </div>
+          <div className="w-48 h-48 bg-white rounded-3xl shadow-xl border border-slate-100 flex items-center justify-center rotate-3 shrink-0">
+             <i className="fas fa-cloud-arrow-down text-6xl text-emerald-500 animate-bounce"></i>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <span className="text-emerald-600 font-bold uppercase tracking-widest text-sm bg-emerald-50 px-4 py-2 rounded-full mb-4 inline-block">Our Ecosystem</span>
+          <h2 className="text-4xl font-bold text-slate-900 mb-4 mt-4">Scientific Precision in Every Seed</h2>
+          <p className="text-slate-500 max-w-2xl mx-auto text-lg">Harness the power of mathematical models and IoT to transform your agricultural production.</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {features.map((f, i) => (
+            <div key={i} className="p-10 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 group">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-emerald-600 group-hover:text-white transition-all transform group-hover:rotate-6">
+                <i className={`fas ${f.icon} text-3xl`}></i>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">{f.title}</h3>
+              <p className="text-slate-600 leading-relaxed text-lg">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Comment Section */}
+      <CommentSection />
+    </div>
+  );
+};
+
+export default Home;

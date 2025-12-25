@@ -1,0 +1,164 @@
+
+import React, { useState } from 'react';
+import { MOCK_SENSORS, MOCK_FIELDS } from '../../constants';
+import { Sensor } from '../../types';
+
+const Sensors: React.FC = () => {
+  const [sensors, setSensors] = useState<Sensor[]>(MOCK_SENSORS);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newSensorForm, setNewSensorForm] = useState({
+    type: 'Moisture/Temp',
+    fieldId: MOCK_FIELDS[0].field_id.toString()
+  });
+
+  const toggleSensor = (id: number) => {
+    setSensors(prev => prev.map(s => {
+      if (s.sensor_id === id) {
+        return { ...s, status: s.status === 'active' ? 'inactive' : 'active' };
+      }
+      return s;
+    }));
+  };
+
+  const handleAddSensor = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newSensor: Sensor = {
+      sensor_id: Math.floor(1000 + Math.random() * 9000),
+      field_id: parseInt(newSensorForm.fieldId),
+      sensor_type: newSensorForm.type,
+      battery_level: 100,
+      status: 'active',
+      last_active: new Date().toISOString()
+    };
+    
+    setSensors([newSensor, ...sensors]);
+    setShowAddModal(false);
+    alert(`Sensor AGR-${newSensor.sensor_id} added successfully!`);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Hardware & Sensors</h1>
+          <p className="text-slate-500 text-sm">Manage your IoT devices and monitor battery levels.</p>
+        </div>
+        <button 
+          onClick={() => setShowAddModal(true)}
+          className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200"
+        >
+          <i className="fas fa-plus"></i> Add New Sensor
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {sensors.map(sensor => {
+          const field = MOCK_FIELDS.find(f => f.field_id === sensor.field_id);
+          return (
+            <div key={sensor.sensor_id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-200 transition-colors">
+              <div className="flex justify-between items-start mb-6">
+                <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
+                  <i className="fas fa-microchip text-xl"></i>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${sensor.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${sensor.status === 'active' ? 'text-emerald-700' : 'text-slate-400'}`}>
+                    {sensor.status}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <h3 className="font-bold text-slate-900">{sensor.sensor_type}</h3>
+                <div className="text-xs text-slate-500">ID: AGR-{sensor.sensor_id} • {field?.field_name || 'Unassigned'}</div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <div className="flex justify-between items-center text-xs mb-1">
+                    <span className="text-slate-500">Battery Level</span>
+                    <span className={`font-bold ${sensor.battery_level < 20 ? 'text-red-500' : 'text-slate-900'}`}>{sensor.battery_level}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${sensor.battery_level < 20 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${sensor.battery_level}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Last Active</span>
+                  <span className="text-slate-900 font-medium">{sensor.status === 'active' ? 'Just now' : 'N/A'}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => toggleSensor(sensor.sensor_id)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${
+                    sensor.status === 'active' 
+                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' 
+                      : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                  }`}
+                >
+                  {sensor.status === 'active' ? 'Pause Sync' : 'Resume Sync'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add Sensor Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
+            <h2 className="text-2xl font-bold mb-6">Pair New Sensor</h2>
+            <form onSubmit={handleAddSensor} className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Sensor Type</label>
+                <select 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={newSensorForm.type}
+                  onChange={e => setNewSensorForm({...newSensorForm, type: e.target.value})}
+                >
+                  <option>Moisture/Temp</option>
+                  <option>NPK Analyzer</option>
+                  <option>PH Probe</option>
+                  <option>Canopy Drone</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Assign to Field</label>
+                <select 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={newSensorForm.fieldId}
+                  onChange={e => setNewSensorForm({...newSensorForm, fieldId: e.target.value})}
+                >
+                  {MOCK_FIELDS.map(f => (
+                    <option key={f.field_id} value={f.field_id}>{f.field_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Confirm Pair
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Sensors;
