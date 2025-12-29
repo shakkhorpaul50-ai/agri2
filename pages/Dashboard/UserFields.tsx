@@ -5,33 +5,58 @@ import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
 import { getCropAnalysis } from '../../services/gemini';
 
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
-  const [fields, setFields] = useState<Field[]>(MOCK_FIELDS);
+  // Initialize from localStorage or mock data
+  const [fields, setFields] = useState<Field[]>(() => {
+    const saved = localStorage.getItem('agricare_fields');
+    return saved ? JSON.parse(saved) : MOCK_FIELDS;
+  });
+  
   const [selectedField, setSelectedField] = useState<Field | null>(null);
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  
+  // Forms state
+  const [formData, setFormData] = useState({ temp: '', moisture: '', ph: '', npk_n: '', npk_p: '', npk_k: '' });
+  const [editFormData, setEditFormData] = useState<Field | null>(null);
 
-  // Manual Data Upload State
-  const [formData, setFormData] = useState({
-    temp: '',
-    moisture: '',
-    ph: '',
-    npk_n: '',
-    npk_p: '',
-    npk_k: '',
-  });
+  // Sync with "database" (localStorage)
+  useEffect(() => {
+    localStorage.setItem('agricare_fields', JSON.stringify(fields));
+  }, [fields]);
 
   const handleFieldSelect = async (field: Field) => {
     setSelectedField(field);
     setLoading(true);
     setRecommendations(null);
-    
-    // Simulate getting latest data and calling Gemini
     const latest = generateMockSensorData(field.field_id)[6];
     const analysis = await getCropAnalysis(field, latest);
-    
     setRecommendations(analysis);
     setLoading(false);
+  };
+
+  const handleDeleteField = (id: number) => {
+    if (window.confirm("Are you sure you want to delete this field? This action cannot be undone.")) {
+      const updated = fields.filter(f => f.field_id !== id);
+      setFields(updated);
+      if (selectedField?.field_id === id) setSelectedField(null);
+    }
+  };
+
+  const handleEditClick = (field: Field) => {
+    setEditFormData({ ...field });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateField = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editFormData) return;
+    
+    const updated = fields.map(f => f.field_id === editFormData.field_id ? editFormData : f);
+    setFields(updated);
+    if (selectedField?.field_id === editFormData.field_id) setSelectedField(editFormData);
+    setShowEditModal(false);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -42,42 +67,18 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   const handleExportCSV = () => {
     if (!selectedField) return;
-
-    // Generate historical data (last 7 days) for the selected field
     const historicalData = generateMockSensorData(selectedField.field_id);
-    
-    // CSV Header
     const headers = ['Timestamp', 'Temperature (°C)', 'Moisture (%)', 'pH Level', 'Conductivity (µs/cm)', 'Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'];
-    
-    // Format rows
     const rows = historicalData.map(row => [
-      row.timestamp,
-      row.temperature.toFixed(2),
-      row.moisture.toFixed(2),
-      row.ph_level.toFixed(2),
-      row.conductivity.toFixed(0),
-      row.npk_n,
-      row.npk_p,
-      row.npk_k
+      row.timestamp, row.temperature.toFixed(2), row.moisture.toFixed(2), row.ph_level.toFixed(2), row.conductivity.toFixed(0), row.npk_n, row.npk_p, row.npk_k
     ]);
-
-    // Construct CSV content
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(e => e.join(','))
-    ].join('\n');
-
-    // Create and trigger download
+    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `agricare_export_${selectedField.field_name.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    link.setAttribute('download', `agricare_export_${selectedField.field_name.toLowerCase().replace(/\s+/g, '_')}.csv`);
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -86,21 +87,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         <h1 className="text-2xl font-bold text-slate-900">My Fields</h1>
         <div className="flex gap-4">
           {selectedField && (
-            <button 
-              onClick={handleExportCSV}
-              className="bg-white text-emerald-600 border border-emerald-100 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-50 transition-colors shadow-sm"
-            >
+            <button onClick={handleExportCSV} className="bg-white text-emerald-600 border border-emerald-100 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-50 transition-colors shadow-sm">
               <i className="fas fa-file-csv"></i> Export Field Data
             </button>
           )}
-          {user.subscriptionPlan === 'basic' && (
-            <button 
-              onClick={() => setShowForm(!showForm)}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-md"
-            >
-              <i className="fas fa-plus"></i> Manual Data Upload
-            </button>
-          )}
+          <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-md">
+            <i className="fas fa-plus"></i> Manual Data Upload
+          </button>
         </div>
       </div>
 
@@ -109,31 +102,15 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           <h3 className="font-bold text-lg mb-4">Manual Sensor Input</h3>
           <form onSubmit={handleFormSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Temperature (°C)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Temp (°C)</label>
               <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.temp} onChange={e => setFormData({...formData, temp: e.target.value})} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Moisture (%)</label>
               <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.moisture} onChange={e => setFormData({...formData, moisture: e.target.value})} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">pH Level</label>
-              <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.ph} onChange={e => setFormData({...formData, ph: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nitrogen (N)</label>
-              <input type="number" required className="w-full px-4 py-2 border rounded-lg" value={formData.npk_n} onChange={e => setFormData({...formData, npk_n: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Phosphorus (P)</label>
-              <input type="number" required className="w-full px-4 py-2 border rounded-lg" value={formData.npk_p} onChange={e => setFormData({...formData, npk_p: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Potassium (K)</label>
-              <input type="number" required className="w-full px-4 py-2 border rounded-lg" value={formData.npk_k} onChange={e => setFormData({...formData, npk_k: e.target.value})} />
-            </div>
             <div className="md:col-span-3">
-              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all">Submit Data for Analysis</button>
+              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all">Submit Data</button>
             </div>
           </form>
         </div>
@@ -142,106 +119,127 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-1 space-y-4">
           {fields.map(f => (
-            <button
+            <div 
               key={f.field_id}
               onClick={() => handleFieldSelect(f)}
-              className={`w-full text-left p-6 rounded-2xl border transition-all ${
+              className={`relative cursor-pointer w-full text-left p-6 rounded-2xl border transition-all ${
                 selectedField?.field_id === f.field_id 
                   ? 'border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500' 
                   : 'border-slate-100 bg-white shadow-sm hover:border-emerald-300'
               }`}
             >
-              <div className="font-bold text-slate-900">{f.field_name}</div>
+              <div className="font-bold text-slate-900 pr-12">{f.field_name}</div>
               <div className="text-sm text-slate-500 mt-1">{f.location}</div>
               <div className="mt-4 flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded text-slate-600">{f.soil_type}</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded text-slate-600">{f.size} acres</span>
               </div>
-            </button>
+              <div className="absolute top-4 right-4 flex flex-col gap-2">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleEditClick(f); }}
+                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:bg-emerald-100 hover:text-emerald-600 flex items-center justify-center transition-colors"
+                >
+                  <i className="fas fa-edit text-xs"></i>
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleDeleteField(f.field_id); }}
+                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors"
+                >
+                  <i className="fas fa-trash text-xs"></i>
+                </button>
+              </div>
+            </div>
           ))}
         </div>
 
         <div className="lg:col-span-3">
           {!selectedField ? (
             <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-20 text-center">
-              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i className="fas fa-map-marked-alt text-3xl text-slate-300"></i>
-              </div>
-              <h2 className="text-xl font-bold text-slate-800 mb-2">Select a field to view analysis</h2>
-              <p className="text-slate-500">Choose one of your registered fields from the left to see sensor data and crop recommendations.</p>
+              <i className="fas fa-map-marked-alt text-3xl text-slate-300 mb-6"></i>
+              <h2 className="text-xl font-bold text-slate-800">Select a field to view analysis</h2>
             </div>
           ) : (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              {/* Analysis Header */}
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
               <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                <div className="flex justify-between items-start mb-8">
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-900 mb-1">{selectedField.field_name} Analysis</h2>
-                    <p className="text-slate-500 text-sm">Real-time Soil & Crop Assessment</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 text-slate-400 hover:text-emerald-500"><i className="fas fa-edit"></i></button>
-                    <button className="p-2 text-slate-400 hover:text-red-500"><i className="fas fa-trash"></i></button>
+                <h2 className="text-2xl font-bold text-slate-900 mb-1">{selectedField.field_name} Analysis</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400"><i className="fas fa-layer-group"></i></div>
+                    <div><div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Soil Type</div><div className="text-sm font-bold text-slate-800">{selectedField.soil_type}</div></div>
                   </div>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                  {[
-                    { label: 'Soil Type', value: selectedField.soil_type, icon: 'fa-layer-group' },
-                    { label: 'Nutrient Status', value: 'Moderate', icon: 'fa-seedling' },
-                    { label: 'Last Activity', value: '15m ago', icon: 'fa-clock' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400">
-                        <i className={`fas ${item.icon}`}></i>
+              {loading ? (
+                <div className="p-12 text-center text-emerald-600 font-bold"><i className="fas fa-circle-notch fa-spin mr-2"></i>Analyzing...</div>
+              ) : recommendations && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {recommendations.map((crop, i) => (
+                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <div className="flex justify-between items-start mb-4">
+                        <i className={`fas ${crop.icon} text-emerald-600 text-xl`}></i>
+                        <span className="text-sm font-bold text-emerald-600">{crop.suitability}% Match</span>
                       </div>
-                      <div>
-                        <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{item.label}</div>
-                        <div className="text-sm font-bold text-slate-800">{item.value}</div>
-                      </div>
+                      <h4 className="text-lg font-bold text-slate-900">{crop.name}</h4>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Yield: {crop.yield}</p>
+                      <p className="text-sm text-slate-600 mt-4">{crop.requirements}</p>
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Crop Recommendations */}
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                    <i className="fas fa-robot text-emerald-500"></i>
-                    AI-Powered Crop Recommendations
-                  </h3>
-                  {loading && <div className="text-sm text-emerald-600 flex items-center gap-2 font-medium">
-                    <i className="fas fa-circle-notch fa-spin"></i> Analyzing with Gemini AI...
-                  </div>}
-                </div>
-
-                {recommendations ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {recommendations.map((crop, i) => (
-                      <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-                            <i className={`fas ${crop.icon} text-xl`}></i>
-                          </div>
-                          <div className="text-sm font-bold text-emerald-600">{crop.suitability}% Match</div>
-                        </div>
-                        <h4 className="text-lg font-bold text-slate-900 mb-1">{crop.name}</h4>
-                        <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-4">Estimated Yield: {crop.yield}</div>
-                        <p className="text-sm text-slate-600 leading-relaxed">{crop.requirements}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : !loading && (
-                  <div className="p-12 text-center bg-slate-50 rounded-2xl border border-slate-200">
-                    <p className="text-slate-400">Analysis results will appear here.</p>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && editFormData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-lg p-8 shadow-2xl animate-in zoom-in duration-200">
+            <h2 className="text-2xl font-bold mb-6">Edit Field Details</h2>
+            <form onSubmit={handleUpdateField} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Field Name</label>
+                <input 
+                  type="text" required className="w-full px-4 py-2 border rounded-xl" 
+                  value={editFormData.field_name}
+                  onChange={e => setEditFormData({...editFormData, field_name: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Location</label>
+                <input 
+                  type="text" required className="w-full px-4 py-2 border rounded-xl" 
+                  value={editFormData.location}
+                  onChange={e => setEditFormData({...editFormData, location: e.target.value})}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Size (Acres)</label>
+                  <input 
+                    type="number" step="0.1" required className="w-full px-4 py-2 border rounded-xl" 
+                    value={editFormData.size}
+                    onChange={e => setEditFormData({...editFormData, size: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Soil Type</label>
+                  <input 
+                    type="text" required className="w-full px-4 py-2 border rounded-xl" 
+                    value={editFormData.soil_type}
+                    onChange={e => setEditFormData({...editFormData, soil_type: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-6">
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100">Cancel</button>
+                <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

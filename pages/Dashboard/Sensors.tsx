@@ -1,15 +1,24 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MOCK_SENSORS, MOCK_FIELDS } from '../../constants';
 import { Sensor } from '../../types';
 
 const Sensors: React.FC = () => {
-  const [sensors, setSensors] = useState<Sensor[]>(MOCK_SENSORS);
+  // Persistence Layer
+  const [sensors, setSensors] = useState<Sensor[]>(() => {
+    const saved = localStorage.getItem('agricare_sensors');
+    return saved ? JSON.parse(saved) : MOCK_SENSORS;
+  });
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSensorForm, setNewSensorForm] = useState({
     type: 'Moisture/Temp',
     fieldId: MOCK_FIELDS[0].field_id.toString()
   });
+
+  useEffect(() => {
+    localStorage.setItem('agricare_sensors', JSON.stringify(sensors));
+  }, [sensors]);
 
   const toggleSensor = (id: number) => {
     setSensors(prev => prev.map(s => {
@@ -18,6 +27,12 @@ const Sensors: React.FC = () => {
       }
       return s;
     }));
+  };
+
+  const handleDeleteSensor = (id: number) => {
+    if (window.confirm("Remove this sensor from your network?")) {
+      setSensors(prev => prev.filter(s => s.sensor_id !== id));
+    }
   };
 
   const handleAddSensor = (e: React.FormEvent) => {
@@ -33,7 +48,6 @@ const Sensors: React.FC = () => {
     
     setSensors([newSensor, ...sensors]);
     setShowAddModal(false);
-    alert(`Sensor AGR-${newSensor.sensor_id} added successfully!`);
   };
 
   return (
@@ -41,11 +55,11 @@ const Sensors: React.FC = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Hardware & Sensors</h1>
-          <p className="text-slate-500 text-sm">Manage your IoT devices and monitor battery levels.</p>
+          <p className="text-slate-500 text-sm">Real-time status of your IoT infrastructure.</p>
         </div>
         <button 
           onClick={() => setShowAddModal(true)}
-          className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200"
+          className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
         >
           <i className="fas fa-plus"></i> Add New Sensor
         </button>
@@ -55,9 +69,9 @@ const Sensors: React.FC = () => {
         {sensors.map(sensor => {
           const field = MOCK_FIELDS.find(f => f.field_id === sensor.field_id);
           return (
-            <div key={sensor.sensor_id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-200 transition-colors">
+            <div key={sensor.sensor_id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group overflow-hidden">
               <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
+                <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
                   <i className="fas fa-microchip text-xl"></i>
                 </div>
                 <div className="flex items-center gap-2">
@@ -80,26 +94,27 @@ const Sensors: React.FC = () => {
                     <span className={`font-bold ${sensor.battery_level < 20 ? 'text-red-500' : 'text-slate-900'}`}>{sensor.battery_level}%</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${sensor.battery_level < 20 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${sensor.battery_level}%` }}></div>
+                    <div className={`h-full rounded-full transition-all duration-1000 ${sensor.battery_level < 20 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${sensor.battery_level}%` }}></div>
                   </div>
-                </div>
-                
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-500">Last Active</span>
-                  <span className="text-slate-900 font-medium">{sensor.status === 'active' ? 'Just now' : 'N/A'}</span>
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <button 
                   onClick={() => toggleSensor(sensor.sensor_id)}
-                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                     sensor.status === 'active' 
                       ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' 
-                      : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
                   }`}
                 >
-                  {sensor.status === 'active' ? 'Pause Sync' : 'Resume Sync'}
+                  {sensor.status === 'active' ? 'Pause' : 'Resume'}
+                </button>
+                <button 
+                  onClick={() => handleDeleteSensor(sensor.sensor_id)}
+                  className="w-10 h-10 rounded-lg bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-all"
+                >
+                  <i className="fas fa-trash-alt text-xs"></i>
                 </button>
               </div>
             </div>
@@ -107,7 +122,6 @@ const Sensors: React.FC = () => {
         })}
       </div>
 
-      {/* Add Sensor Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
@@ -115,43 +129,15 @@ const Sensors: React.FC = () => {
             <form onSubmit={handleAddSensor} className="space-y-6">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Sensor Type</label>
-                <select 
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={newSensorForm.type}
-                  onChange={e => setNewSensorForm({...newSensorForm, type: e.target.value})}
-                >
+                <select className="w-full px-4 py-3 rounded-xl border border-slate-200" value={newSensorForm.type} onChange={e => setNewSensorForm({...newSensorForm, type: e.target.value})}>
                   <option>Moisture/Temp</option>
                   <option>NPK Analyzer</option>
                   <option>PH Probe</option>
-                  <option>Canopy Drone</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Assign to Field</label>
-                <select 
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={newSensorForm.fieldId}
-                  onChange={e => setNewSensorForm({...newSensorForm, fieldId: e.target.value})}
-                >
-                  {MOCK_FIELDS.map(f => (
-                    <option key={f.field_id} value={f.field_id}>{f.field_name}</option>
-                  ))}
                 </select>
               </div>
               <div className="flex gap-3 pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700"
-                >
-                  Confirm Pair
-                </button>
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100">Cancel</button>
+                <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600">Pair Device</button>
               </div>
             </form>
           </div>
