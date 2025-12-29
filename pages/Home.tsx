@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import CommentSection from '../components/CommentSection';
 
@@ -8,33 +9,41 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  const heroImages = [
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=2000&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=2000&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?q=80&w=2000&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?q=80&w=2000&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1595841696677-54897f28bc12?q=80&w=2000&auto=format&fit=crop'
+  ];
 
   useEffect(() => {
+    const slideInterval = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % heroImages.length);
+    }, 5000);
+
     const handler = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
 
     return () => {
+      clearInterval(slideInterval);
       window.removeEventListener('beforeinstallprompt', handler);
     };
-  }, []);
+  }, [heroImages.length]);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
-      // Show the install prompt
       deferredPrompt.prompt();
-      // Wait for the user to respond to the prompt
       const { outcome } = await deferredPrompt.userChoice;
       console.log(`User response to the install prompt: ${outcome}`);
-      // We've used the prompt, and can't use it again, throw it away
       setDeferredPrompt(null);
     } else {
-      // Fallback for browsers that don't support beforeinstallprompt (like iOS Safari)
       setShowInstallModal(true);
     }
   };
@@ -50,14 +59,23 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
 
   return (
     <div className="space-y-20 pb-20">
-      {/* Hero Section */}
-      <section className="relative h-[650px] flex items-center overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center z-0" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1592982537447-7440770cbfc9?q=80&w=2000&auto=format&fit=crop)' }}>
-          <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[2px]"></div>
+      {/* Hero Section with Slideshow */}
+      <section className="relative h-[700px] flex items-center overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          {heroImages.map((img, index) => (
+            <div
+              key={index}
+              className={`absolute inset-0 bg-cover bg-center transition-opacity duration-[2000ms] ease-in-out ${
+                index === activeSlide ? 'opacity-100 scale-105 transition-transform duration-[10000ms]' : 'opacity-0 scale-100'
+              }`}
+              style={{ backgroundImage: `url(${img})` }}
+            />
+          ))}
+          <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[1px]"></div>
         </div>
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left">
-          <div className="max-w-3xl">
+          <div className="max-w-3xl animate-in fade-in slide-in-from-left-8 duration-1000">
             <h1 className="text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6">
               The Future of <span className="text-emerald-400 underline decoration-emerald-500/30">Yield Optimization</span> is Here
             </h1>
@@ -82,6 +100,19 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
                   <div className="text-sm font-medium">Add to Home Screen</div>
                 </div>
               </button>
+            </div>
+            
+            {/* Slide Indicators */}
+            <div className="mt-12 flex gap-3 justify-center sm:justify-start">
+              {heroImages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveSlide(idx)}
+                  className={`h-1 rounded-full transition-all duration-300 ${
+                    idx === activeSlide ? 'w-8 bg-emerald-400' : 'w-4 bg-white/30'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         </div>
