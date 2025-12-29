@@ -19,7 +19,6 @@ export const generateMockSensorData = (fieldId: number): SensorData[] => {
       temperature: 24 + Math.random() * 8,
       moisture: 40 + Math.random() * 30,
       ph_level: 5.5 + Math.random() * 1.5,
-      conductivity: 400 + Math.random() * 400,
       npk_n: 35 + Math.random() * 25,
       npk_p: 25 + Math.random() * 20,
       npk_k: 45 + Math.random() * 30,
@@ -30,8 +29,8 @@ export const generateMockSensorData = (fieldId: number): SensorData[] => {
 };
 
 export const MOCK_SENSORS: Sensor[] = [
-  { sensor_id: 101, field_id: 1, sensor_type: 'Moisture/Temp', battery_level: 85, status: 'active', last_active: new Date().toISOString() },
+  { sensor_id: 101, field_id: 1, sensor_type: 'Temperature', battery_level: 85, status: 'active', last_active: new Date().toISOString() },
   { sensor_id: 102, field_id: 1, sensor_type: 'NPK Analyzer', battery_level: 42, status: 'active', last_active: new Date().toISOString() },
-  { sensor_id: 103, field_id: 2, sensor_type: 'Integrated Soil Probe', battery_level: 95, status: 'active', last_active: new Date().toISOString() },
-  { sensor_id: 104, field_id: 3, sensor_type: 'Moisture', battery_level: 12, status: 'inactive', last_active: new Date().toISOString() },
+  { sensor_id: 103, field_id: 2, sensor_type: 'Moisture', battery_level: 95, status: 'active', last_active: new Date().toISOString() },
+  { sensor_id: 104, field_id: 3, sensor_type: 'pH Sensor', battery_level: 12, status: 'inactive', last_active: new Date().toISOString() },
 ];

@@ -24,7 +24,6 @@ export interface SensorData {
   temperature: number;
   moisture: number;
   ph_level: number;
-  conductivity: number;
   npk_n: number;
   npk_p: number;
   npk_k: number;

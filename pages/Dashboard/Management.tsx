@@ -8,18 +8,14 @@ const Management: React.FC = () => {
     data: generateMockSensorData(f.field_id)[6] // Get latest mock data
   }));
 
-  // Logic for watering recommendations
   const getWaterPrescription = (moisture: number, size: number) => {
-    const targetMoisture = 65; // Ideal
+    const targetMoisture = 65; 
     if (moisture >= targetMoisture) return null;
-    
     const deficit = targetMoisture - moisture;
-    // Simple model: 1% moisture deficit on 1 acre requires ~1000 Liters (rough estimation for UI)
     const litersRequired = Math.round(deficit * size * 1000);
     return litersRequired;
   };
 
-  // Logic for fertilizer recommendations
   const getFertilizerPrescription = (npk_n: number, npk_p: number, npk_k: number) => {
     const targetN = 60;
     const targetP = 50;
@@ -57,14 +53,12 @@ const Management: React.FC = () => {
 
       reportContent += `PRESCRIPTIVE ACTIONS:\n`;
       
-      // Water Prescription
       if (waterNeed) {
         reportContent += `[!] IRRIGATION: Required. Apply approx. ${waterNeed.toLocaleString()} Liters.\n`;
       } else {
         reportContent += `[✓] IRRIGATION: Not required. Soil moisture is optimal.\n`;
       }
 
-      // Fertilizer Prescription
       if (fertNeeds.length > 0) {
         reportContent += `[!] FERTILIZER: Deficit detected.\n`;
         fertNeeds.forEach(n => {
@@ -79,7 +73,6 @@ const Management: React.FC = () => {
 
     reportContent += `End of Report.\n`;
 
-    // Trigger Download
     const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -96,7 +89,7 @@ const Management: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="mb-10">
         <h1 className="text-3xl font-bold text-slate-900">Farm Management Hub</h1>
-        <p className="text-slate-500">Intelligent alerts and prescriptive actions for your fields.</p>
+        <p className="text-slate-500">Focusing on Temperature, pH, Moisture, and NPK prescriptions.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -117,7 +110,6 @@ const Management: React.FC = () => {
                 </div>
                 
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Water Module */}
                   <div className={`p-5 rounded-2xl border ${waterNeed ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${waterNeed ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
@@ -129,14 +121,12 @@ const Management: React.FC = () => {
                       <div>
                         <div className="text-xs font-bold text-blue-700 uppercase mb-1">Action Required</div>
                         <p className="text-sm text-blue-900 mb-3 font-medium">Apply approx. <strong>{waterNeed.toLocaleString()} Liters</strong> of water.</p>
-                        <div className="text-[10px] text-blue-500 font-mono italic">Based on {data.moisture.toFixed(1)}% current moisture.</div>
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500">Soil moisture is optimal ({data.moisture.toFixed(1)}%). No irrigation needed.</p>
+                      <p className="text-sm text-slate-500">Soil moisture is optimal ({data.moisture.toFixed(1)}%).</p>
                     )}
                   </div>
 
-                  {/* Fertilizer Module */}
                   <div className={`p-5 rounded-2xl border ${fertNeeds.length > 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${fertNeeds.length > 0 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
@@ -154,7 +144,7 @@ const Management: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500">Nutrient levels are stable. No fertilization required.</p>
+                      <p className="text-sm text-slate-500">NPK levels are stable.</p>
                     )}
                   </div>
                 </div>
@@ -163,18 +153,17 @@ const Management: React.FC = () => {
           })}
         </div>
 
-        {/* Sidebar Info */}
         <div className="space-y-8">
           <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white">
             <h3 className="text-xl font-bold mb-6">Management Science</h3>
             <div className="space-y-6">
               <div className="border-l-2 border-emerald-500 pl-4">
                 <div className="text-xs text-slate-400 uppercase font-bold tracking-widest mb-1">Watering Model</div>
-                <p className="text-xs text-slate-300">Our IWR formula accounts for volumetric water content (VWC) and field capacity.</p>
+                <p className="text-xs text-slate-300">Targeting optimal VWC levels for your specific field size.</p>
               </div>
               <div className="border-l-2 border-blue-500 pl-4">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-widest mb-1">Nutrient Stoichiometry</div>
-                <p className="text-xs text-slate-300">NPK requirements are matched against target growth curves for specific cultivars.</p>
+                <div className="text-xs text-slate-400 uppercase font-bold tracking-widest mb-1">pH and NPK Balance</div>
+                <p className="text-xs text-slate-300">Coordinating soil acidity with nutrient availability markers.</p>
               </div>
             </div>
             <button 
@@ -183,13 +172,6 @@ const Management: React.FC = () => {
             >
               Download Full Report
             </button>
-          </div>
-
-          <div className="bg-emerald-50 p-6 rounded-[2.5rem] border border-emerald-100">
-            <h4 className="font-bold text-emerald-900 mb-2">Weather Synergy</h4>
-            <p className="text-xs text-emerald-700 leading-relaxed">
-              Agricare integrates 48h forecasts. If heavy rain is predicted, irrigation alerts are automatically suppressed to prevent water wastage.
-            </p>
           </div>
         </div>
       </div>

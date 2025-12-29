@@ -5,7 +5,6 @@ import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
 import { getCropAnalysis } from '../../services/gemini';
 
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
-  // Initialize from localStorage or mock data
   const [fields, setFields] = useState<Field[]>(() => {
     const saved = localStorage.getItem('agricare_fields');
     return saved ? JSON.parse(saved) : MOCK_FIELDS;
@@ -17,11 +16,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   
-  // Forms state
   const [formData, setFormData] = useState({ temp: '', moisture: '', ph: '', npk_n: '', npk_p: '', npk_k: '' });
   const [editFormData, setEditFormData] = useState<Field | null>(null);
 
-  // Sync with "database" (localStorage)
   useEffect(() => {
     localStorage.setItem('agricare_fields', JSON.stringify(fields));
   }, [fields]);
@@ -37,7 +34,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleDeleteField = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this field? This action cannot be undone.")) {
+    if (window.confirm("Are you sure you want to delete this field?")) {
       const updated = fields.filter(f => f.field_id !== id);
       setFields(updated);
       if (selectedField?.field_id === id) setSelectedField(null);
@@ -52,7 +49,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const handleUpdateField = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFormData) return;
-    
     const updated = fields.map(f => f.field_id === editFormData.field_id ? editFormData : f);
     setFields(updated);
     if (selectedField?.field_id === editFormData.field_id) setSelectedField(editFormData);
@@ -61,16 +57,16 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Data uploaded successfully! Analysis will refresh in a few moments.");
+    alert("Data uploaded successfully! Only Temperature, pH, Moisture, and NPK markers are processed.");
     setShowForm(false);
   };
 
   const handleExportCSV = () => {
     if (!selectedField) return;
     const historicalData = generateMockSensorData(selectedField.field_id);
-    const headers = ['Timestamp', 'Temperature (°C)', 'Moisture (%)', 'pH Level', 'Conductivity (µs/cm)', 'Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'];
+    const headers = ['Timestamp', 'Temperature (°C)', 'Moisture (%)', 'pH Level', 'Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'];
     const rows = historicalData.map(row => [
-      row.timestamp, row.temperature.toFixed(2), row.moisture.toFixed(2), row.ph_level.toFixed(2), row.conductivity.toFixed(0), row.npk_n, row.npk_p, row.npk_k
+      row.timestamp, row.temperature.toFixed(2), row.moisture.toFixed(2), row.ph_level.toFixed(2), row.npk_n, row.npk_p, row.npk_k
     ]);
     const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -88,7 +84,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         <div className="flex gap-4">
           {selectedField && (
             <button onClick={handleExportCSV} className="bg-white text-emerald-600 border border-emerald-100 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-50 transition-colors shadow-sm">
-              <i className="fas fa-file-csv"></i> Export Field Data
+              <i className="fas fa-file-csv"></i> Export Data
             </button>
           )}
           <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-md">
@@ -99,8 +95,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
       {showForm && (
         <div className="mb-8 bg-white p-6 rounded-2xl shadow-md border border-emerald-100 animate-in fade-in slide-in-from-top-4">
-          <h3 className="font-bold text-lg mb-4">Manual Sensor Input</h3>
-          <form onSubmit={handleFormSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <h3 className="font-bold text-lg mb-4">Manual Sensor Input (4 Core Markers)</h3>
+          <form onSubmit={handleFormSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Temp (°C)</label>
               <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.temp} onChange={e => setFormData({...formData, temp: e.target.value})} />
@@ -109,8 +105,16 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <label className="block text-sm font-medium text-slate-700 mb-1">Moisture (%)</label>
               <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.moisture} onChange={e => setFormData({...formData, moisture: e.target.value})} />
             </div>
-            <div className="md:col-span-3">
-              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all">Submit Data</button>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">pH Level</label>
+              <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.ph} onChange={e => setFormData({...formData, ph: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">NPK - Nitrogen (ppm)</label>
+              <input type="number" required className="w-full px-4 py-2 border rounded-lg" value={formData.npk_n} onChange={e => setFormData({...formData, npk_n: e.target.value})} />
+            </div>
+            <div className="md:col-span-4">
+              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all">Submit Analysis Data</button>
             </div>
           </form>
         </div>
@@ -132,21 +136,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <div className="text-sm text-slate-500 mt-1">{f.location}</div>
               <div className="mt-4 flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded text-slate-600">{f.soil_type}</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded text-slate-600">{f.size} acres</span>
               </div>
               <div className="absolute top-4 right-4 flex flex-col gap-2">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleEditClick(f); }}
-                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:bg-emerald-100 hover:text-emerald-600 flex items-center justify-center transition-colors"
-                >
-                  <i className="fas fa-edit text-xs"></i>
-                </button>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteField(f.field_id); }}
-                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors"
-                >
-                  <i className="fas fa-trash text-xs"></i>
-                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleEditClick(f); }} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:bg-emerald-100 hover:text-emerald-600 flex items-center justify-center transition-colors"><i className="fas fa-edit text-xs"></i></button>
               </div>
             </div>
           ))}
@@ -162,12 +154,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
               <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                 <h2 className="text-2xl font-bold text-slate-900 mb-1">{selectedField.field_name} Analysis</h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400"><i className="fas fa-layer-group"></i></div>
-                    <div><div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Soil Type</div><div className="text-sm font-bold text-slate-800">{selectedField.soil_type}</div></div>
-                  </div>
-                </div>
+                <p className="text-slate-500">Monitoring Temperature, pH, Moisture, and NPK.</p>
               </div>
 
               {loading ? (
@@ -192,7 +179,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Edit Modal */}
       {showEditModal && editFormData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-lg p-8 shadow-2xl animate-in zoom-in duration-200">
@@ -200,37 +186,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
             <form onSubmit={handleUpdateField} className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Field Name</label>
-                <input 
-                  type="text" required className="w-full px-4 py-2 border rounded-xl" 
-                  value={editFormData.field_name}
-                  onChange={e => setEditFormData({...editFormData, field_name: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Location</label>
-                <input 
-                  type="text" required className="w-full px-4 py-2 border rounded-xl" 
-                  value={editFormData.location}
-                  onChange={e => setEditFormData({...editFormData, location: e.target.value})}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Size (Acres)</label>
-                  <input 
-                    type="number" step="0.1" required className="w-full px-4 py-2 border rounded-xl" 
-                    value={editFormData.size}
-                    onChange={e => setEditFormData({...editFormData, size: Number(e.target.value)})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Soil Type</label>
-                  <input 
-                    type="text" required className="w-full px-4 py-2 border rounded-xl" 
-                    value={editFormData.soil_type}
-                    onChange={e => setEditFormData({...editFormData, soil_type: e.target.value})}
-                  />
-                </div>
+                <input type="text" required className="w-full px-4 py-2 border rounded-xl" value={editFormData.field_name} onChange={e => setEditFormData({...editFormData, field_name: e.target.value})} />
               </div>
               <div className="flex gap-3 pt-6">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100">Cancel</button>

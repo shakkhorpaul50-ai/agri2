@@ -23,28 +23,23 @@ const PublicDashboard: React.FC = () => {
   const latest = data[data.length - 1];
 
   const handleExportCSV = () => {
-    // CSV Header
-    const headers = ['Timestamp', 'Temperature (°C)', 'Moisture (%)', 'pH Level', 'Conductivity (µs/cm)', 'Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'];
+    const headers = ['Timestamp', 'Temperature (°C)', 'Moisture (%)', 'pH Level', 'Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'];
     
-    // Format rows
     const rows = data.map(row => [
       row.timestamp,
       row.temperature.toFixed(2),
       row.moisture.toFixed(2),
       row.ph_level.toFixed(2),
-      row.conductivity.toFixed(0),
       row.npk_n,
       row.npk_p,
       row.npk_k
     ]);
 
-    // Construct CSV content
     const csvContent = [
       headers.join(','),
       ...rows.map(e => e.join(','))
     ].join('\n');
 
-    // Create and trigger download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -62,7 +57,7 @@ const PublicDashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Public Demo Dashboard</h1>
-          <p className="text-slate-500">View real-time sample data from our test fields.</p>
+          <p className="text-slate-500">View real-time sample data for Temperature, pH, Moisture, and NPK.</p>
         </div>
         
         <div className="flex p-1 bg-slate-100 rounded-xl">
@@ -87,7 +82,7 @@ const PublicDashboard: React.FC = () => {
           { label: 'Temperature', value: `${latest.temperature.toFixed(1)}°C`, icon: 'fa-temperature-high', color: 'text-orange-500' },
           { label: 'Soil Moisture', value: `${latest.moisture.toFixed(1)}%`, icon: 'fa-droplet', color: 'text-blue-500' },
           { label: 'pH Level', value: latest.ph_level.toFixed(1), icon: 'fa-flask', color: 'text-purple-500' },
-          { label: 'Conductivity', value: `${latest.conductivity.toFixed(0)} µs/cm`, icon: 'fa-bolt', color: 'text-yellow-500' },
+          { label: 'Nitrogen (N)', value: `${latest.npk_n} ppm`, icon: 'fa-leaf', color: 'text-emerald-500' },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -151,7 +146,6 @@ const PublicDashboard: React.FC = () => {
                 <th className="px-6 py-4">Temp (°C)</th>
                 <th className="px-6 py-4">Moisture (%)</th>
                 <th className="px-6 py-4">pH</th>
-                <th className="px-6 py-4">Conductivity</th>
                 <th className="px-6 py-4">NPK (N-P-K)</th>
               </tr>
             </thead>
@@ -162,7 +156,6 @@ const PublicDashboard: React.FC = () => {
                   <td className="px-6 py-4">{row.temperature.toFixed(1)}</td>
                   <td className="px-6 py-4">{row.moisture.toFixed(1)}</td>
                   <td className="px-6 py-4">{row.ph_level.toFixed(1)}</td>
-                  <td className="px-6 py-4">{row.conductivity.toFixed(0)}</td>
                   <td className="px-6 py-4">
                     <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded">{row.npk_n}</span>
                     <span className="mx-1">-</span>
