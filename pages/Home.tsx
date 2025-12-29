@@ -12,11 +12,11 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
   const [activeSlide, setActiveSlide] = useState(0);
 
   const heroImages = [
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=2000&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=2000&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?q=80&w=2000&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?q=80&w=2000&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1595841696677-54897f28bc12?q=80&w=2000&auto=format&fit=crop'
+    'https://images.unsplash.com/photo-1590496793907-39b56f3a763c?q=80&w=2000&auto=format&fit=crop', // Bangladeshi farmer in field
+    'https://images.unsplash.com/photo-1508808788246-7dc977ff3b52?q=80&w=2000&auto=format&fit=crop', // Traditional agricultural landscape
+    'https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?q=80&w=2000&auto=format&fit=crop', // South Asian farming culture
+    'https://images.unsplash.com/photo-1611003228941-98a52e6dc425?q=80&w=2000&auto=format&fit=crop', // Green paddy field workers
+    'https://images.unsplash.com/photo-1589923188900-85dae523342b?q=80&w=2000&auto=format&fit=crop'  // Lush agricultural greenery
   ];
 
   useEffect(() => {
@@ -80,7 +80,7 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
               The Future of <span className="text-emerald-400 underline decoration-emerald-500/30">Yield Optimization</span> is Here
             </h1>
             <p className="text-xl text-emerald-50 mb-10 leading-relaxed max-w-2xl opacity-90">
-              Transform your farm with high-precision IoT telemetry and AI insights. Agricare bridges the gap between traditional wisdom and modern data science.
+              Empowering farmers across Bangladesh with high-precision IoT telemetry and AI insights. Agricare bridges the gap between traditional wisdom and modern data science.
             </p>
             <div className="flex flex-col sm:flex-row gap-5 justify-center sm:justify-start">
               <button 
