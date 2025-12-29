@@ -17,13 +17,23 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onSwitchToLogin }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSignup({
-      id: Math.random().toString(),
+    
+    const newUser: User = {
+      id: Math.random().toString(36).substr(2, 9),
       name: formData.name,
       email: formData.email,
       subscriptionPlan: formData.plan as any,
       subscriptionEnd: '2025-12-31'
-    });
+    };
+
+    // Save to our mock "database" of users so they can log back in later
+    const registeredUsers = JSON.parse(localStorage.getItem('agricare_registered_users') || '[]');
+    // Check if user already exists to avoid duplicates
+    if (!registeredUsers.find((u: User) => u.email === formData.email)) {
+      localStorage.setItem('agricare_registered_users', JSON.stringify([...registeredUsers, newUser]));
+    }
+    
+    onSignup(newUser);
   };
 
   return (
@@ -79,8 +89,8 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onSwitchToLogin }) => {
                 value={formData.plan}
                 onChange={e => setFormData({...formData, plan: e.target.value})}
               >
-                <option value="basic">Basic ($15/mo)</option>
-                <option value="premium">Premium ($50/mo) - Best Value</option>
+                <option value="basic">Basic (৳1,500/mo)</option>
+                <option value="premium">Premium (৳5,000/mo) - Best Value</option>
               </select>
             </div>
           </div>

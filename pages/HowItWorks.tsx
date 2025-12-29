@@ -2,190 +2,183 @@
 import React from 'react';
 
 const HowItWorks: React.FC = () => {
-  const steps = [
-    {
-      id: "01",
-      title: "Create Your Digital Farm",
-      desc: "Sign up and configure your organizational profile. Choose between Basic (manual data) or Premium (automated IoT) plans to unlock specific features.",
-      icon: "fa-user-plus",
-      color: "bg-emerald-500"
-    },
-    {
-      id: "02",
-      title: "Map Your Fields",
-      desc: "Go to the 'My Fields' tab to register your land. Specify the area (acres/ha) and soil composition. This allows our AI to calibrate specific crop recommendations.",
-      icon: "fa-map-location-dot",
-      color: "bg-blue-500"
-    },
-    {
-      id: "03",
-      title: "Pair IoT Hardware",
-      desc: "Using the 'Sensors' tab, enter the unique ID of your Agricare Nodes. Link each physical sensor to its corresponding field for live telemetry synchronization.",
-      icon: "fa-link",
-      color: "bg-purple-500"
-    },
-    {
-      id: "04",
-      title: "Act on Prescriptions",
-      desc: "Visit the 'Management' hub daily. The app will provide exact instructions—e.g., 'Apply 4,200 Liters of water' or 'Apply 3 bags of Urea'—based on real-time soil chemistry.",
-      icon: "fa-clipboard-check",
-      color: "bg-orange-500"
-    }
-  ];
-
   return (
-    <div className="bg-slate-50">
-      {/* Header Section */}
-      <section className="relative overflow-hidden bg-emerald-950 py-24">
-        <div className="max-w-7xl mx-auto px-4 text-center relative z-10">
-          <h1 className="text-4xl md:text-6xl font-black text-white mb-6">The Science of Growth</h1>
-          <p className="text-xl text-emerald-100/80 max-w-2xl mx-auto leading-relaxed">
-            Discover how Agricare's precision hardware and cloud intelligence work together to revolutionize your field's potential.
-          </p>
-          
-          <div className="mt-12 flex justify-center gap-8 text-emerald-400">
-            <div className="flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full border border-emerald-500/30 flex items-center justify-center mb-2">
-                <i className="fas fa-microchip"></i>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-tighter">IoT Sensing</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full border border-emerald-500/30 flex items-center justify-center mb-2">
-                <i className="fas fa-wifi"></i>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-tighter">LoRaWAN Sync</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full border border-emerald-500/30 flex items-center justify-center mb-2">
-                <i className="fas fa-brain"></i>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-tighter">AI Analysis</span>
-            </div>
-          </div>
+    <div className="bg-white min-h-screen">
+      {/* Hero Section */}
+      <section className="relative py-24 bg-emerald-900 overflow-hidden">
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-400 rounded-full -translate-x-1/2 -translate-y-1/2 blur-[100px]"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-400 rounded-full translate-x-1/2 translate-y-1/2 blur-[100px]"></div>
         </div>
         
-        {/* Decorative Background Elements */}
-        <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-500/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl"></div>
-      </section>
-
-      {/* Sensor Deep Dive Section */}
-      <section className="max-w-6xl mx-auto px-4 py-24 space-y-32">
-        <div className="text-center">
-          <h2 className="text-4xl font-bold text-slate-900 mb-6">How Our Sensors Help You Grow</h2>
-          <p className="text-xl text-slate-500 max-w-3xl mx-auto">Scientific precision integrated into every circuit. We monitor 14 different environmental markers to ensure optimal plant phenology.</p>
-        </div>
-
-        {/* Moisture Detail */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <span className="text-emerald-600 font-bold uppercase tracking-widest text-sm bg-emerald-50 px-3 py-1 rounded">Moisture Dynamics</span>
-            <h3 className="text-3xl font-bold text-slate-900 mt-4 mb-6">Volumetric Water Content ($VWC$)</h3>
-            <p className="text-slate-600 text-lg leading-relaxed mb-6">
-              Our sensors use <strong>Time-Domain Reflectometry (TDR)</strong> to measure the soil's dielectric constant. This allows us to calculate the exact percentage of water volume relative to total soil volume.
-            </p>
-            <div className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm">
-              <div className="text-sm font-bold text-slate-800 mb-2 underline decoration-emerald-200">The Science:</div>
-              <p className="text-sm text-slate-500 leading-relaxed italic">
-                By detecting moisture at 15cm (Surface), 30cm (Root Base), and 60cm (Sub-base), we can determine if water is reaching the roots or simply evaporating from the surface.
-              </p>
-            </div>
-          </div>
-          <div className="bg-white p-10 rounded-[3rem] shadow-inner border border-slate-100 flex flex-col items-center">
-             <div className="text-2xl font-mono text-emerald-700 font-bold mb-4 italic">VWC = (V<sub>w</sub> / V<sub>s</sub>) × 100</div>
-             <div className="w-48 h-64 bg-slate-200 rounded-2xl relative overflow-hidden border-4 border-slate-300">
-               <div className="absolute bottom-0 w-full bg-blue-500/80 animate-bounce duration-[3000ms]" style={{ height: '40%' }}></div>
-               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-black text-slate-800">40%</div>
-             </div>
-          </div>
-        </div>
-
-        {/* NPK Detail */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center lg:flex-row-reverse">
-          <div className="order-1 lg:order-2">
-            <span className="text-blue-600 font-bold uppercase tracking-widest text-sm bg-blue-50 px-3 py-1 rounded">Nutrient Balance</span>
-            <h3 className="text-3xl font-bold text-slate-900 mt-4 mb-6">Real-Time Stoichiometry</h3>
-            <p className="text-slate-600 text-lg leading-relaxed mb-6">
-              Unlike traditional soil tests that take weeks, our Ion-Selective Electrodes (ISE) monitor active ions in the soil solution. We track <strong>Nitrogen (N)</strong> for leaf growth, <strong>Phosphorus (P)</strong> for ATP/Energy, and <strong>Potassium (K)</strong> for water regulation.
-            </p>
-            <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm">
-              <div className="text-sm font-bold text-slate-800 mb-2 underline decoration-blue-200">The Impact:</div>
-              <p className="text-sm text-slate-500 leading-relaxed italic">
-                Over-fertilization leads to salt buildup and nitrogen runoff. We help you apply precisely what the plant can absorb, reducing costs by up to 22%.
-              </p>
-            </div>
-          </div>
-          <div className="order-2 lg:order-1 grid grid-cols-3 gap-4">
-             {['N', 'P', 'K'].map((nut) => (
-               <div key={nut} className="bg-slate-900 text-white h-40 rounded-3xl flex flex-col items-center justify-center shadow-2xl">
-                 <span className="text-4xl font-black">{nut}</span>
-                 <span className="text-[10px] uppercase font-bold text-slate-400 mt-2">Sensor Active</span>
-               </div>
-             ))}
-          </div>
-        </div>
-
-        {/* Weather Detail */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <span className="text-orange-600 font-bold uppercase tracking-widest text-sm bg-orange-50 px-3 py-1 rounded">Atmospheric Analysis</span>
-            <h3 className="text-3xl font-bold text-slate-900 mt-4 mb-6">Vapor Pressure Deficit ($VPD$)</h3>
-            <p className="text-slate-600 text-lg leading-relaxed mb-6">
-              We monitor the difference between the amount of moisture in the air and how much it can hold when saturated. High VPD causes plants to close their stomata, halting photosynthesis.
-            </p>
-            <div className="bg-white p-6 rounded-2xl border border-orange-100 shadow-sm">
-              <div className="text-sm font-bold text-slate-800 mb-2 underline decoration-orange-200">The Harvest Secret:</div>
-              <p className="text-sm text-slate-500 leading-relaxed italic">
-                By correlating VPD with Growing Degree Days (GDD), we can predict the exact harvest window with 98% accuracy.
-              </p>
-            </div>
-          </div>
-          <div className="relative">
-            <img src="https://images.unsplash.com/photo-1594398901394-4e34939a4fe0?q=80&w=800&auto=format&fit=crop" className="rounded-[3rem] shadow-2xl" alt="Weather sensing" />
-            <div className="absolute -top-6 -right-6 bg-white p-4 rounded-2xl shadow-xl border border-slate-100 max-w-[200px]">
-               <div className="text-xs font-bold text-orange-500 mb-1">VPD Alert</div>
-               <div className="text-sm text-slate-900 font-bold italic">1.2 kPa - Moderate Stress</div>
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 relative z-10 text-center">
+          <span className="inline-block px-4 py-2 rounded-full bg-emerald-800/50 border border-emerald-700 text-emerald-300 text-xs font-bold uppercase tracking-widest mb-6">
+            Hardware Engineering
+          </span>
+          <h1 className="text-4xl md:text-6xl font-black text-white mb-8">
+            The Science Behind <br/><span className="text-emerald-400">Precision Agriculture</span>
+          </h1>
+          <p className="text-xl text-emerald-100/70 max-w-3xl mx-auto leading-relaxed">
+            Our multi-parameter IoT probes utilize advanced electrochemical and dielectric sensors to translate soil biology into actionable digital data.
+          </p>
         </div>
       </section>
 
-      {/* Quick Start Guide Section */}
-      <section className="bg-white py-24 px-4 border-t border-slate-100">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-20">
-            <span className="text-emerald-600 font-bold uppercase tracking-widest text-xs mb-4 block">Onboarding Guide</span>
-            <h2 className="text-4xl font-bold text-slate-900">How to use the Agricare Platform</h2>
-            <p className="text-slate-500 mt-4">Four simple steps to transform your agricultural data into actionable yield.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((step, idx) => (
-              <div key={idx} className="relative group">
-                <div className="absolute -top-6 -left-6 text-8xl font-black text-slate-50 opacity-10 group-hover:text-emerald-100 transition-colors pointer-events-none">
-                  {step.id}
-                </div>
-                <div className="relative bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-100 transition-all duration-300 h-full">
-                  <div className={`w-14 h-14 ${step.color} text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-slate-200`}>
-                    <i className={`fas ${step.icon} text-2xl`}></i>
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-4">{step.title}</h3>
-                  <p className="text-slate-600 text-sm leading-relaxed">{step.desc}</p>
-                </div>
+      {/* Sensor Deep Dives */}
+      <div className="max-w-7xl mx-auto px-4 py-24 space-y-32">
+        
+        {/* 1. Temperature Sensor */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center">
+                <i className="fas fa-temperature-high text-xl"></i>
               </div>
-            ))}
+              <h2 className="text-3xl font-bold text-slate-900">Thermal Gradient Monitoring</h2>
+            </div>
+            <p className="text-lg text-slate-600 mb-6 leading-relaxed">
+              Agricare utilizes high-precision <strong>Negative Temperature Coefficient (NTC) Thermistors</strong>. These sensors operate by measuring the change in electrical resistance as soil temperature fluctuates. 
+            </p>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <h4 className="font-bold text-slate-800 mb-2 italic">How it works in the field:</h4>
+                <p className="text-sm text-slate-600">
+                  Temperature dictates the rate of plant metabolism and microbial activity. Our sensors track soil heat at root depth to calculate <strong>Growing Degree Days (GDD)</strong>. This helps farmers in Bangladesh predict exactly when a crop like Rice or Wheat will transition from the vegetative to the reproductive stage, ensuring precise harvest timing.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="order-1 lg:order-2">
+            <img 
+              src="https://images.unsplash.com/photo-1510133769068-68884a589708?q=80&w=1200&auto=format&fit=crop" 
+              className="rounded-[3rem] shadow-2xl border-8 border-white hover:scale-105 transition-transform duration-500" 
+              alt="Temperature Sensor" 
+            />
+          </div>
+        </section>
+
+        {/* 2. Moisture Sensor */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <img 
+              src="https://images.unsplash.com/photo-1592982537447-7440770cbfc9?q=80&w=1200&auto=format&fit=crop" 
+              className="rounded-[3rem] shadow-2xl border-8 border-white hover:scale-105 transition-transform duration-500" 
+              alt="Moisture Sensor" 
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                <i className="fas fa-droplet text-xl"></i>
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900">Volumetric Water Content (VWC)</h2>
+            </div>
+            <p className="text-lg text-slate-600 mb-6 leading-relaxed">
+              Our moisture sensors employ <strong>Capacitive Frequency Domain Reflectometry (FDR)</strong>. Unlike cheap resistive sensors, capacitive probes do not corrode and provide much higher accuracy.
+            </p>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <h4 className="font-bold text-slate-800 mb-2 italic">How it works in the field:</h4>
+                <p className="text-sm text-slate-600">
+                  By creating an electromagnetic field, the sensor measures the soil's dielectric constant, which is primarily influenced by water content. In the real field, this prevents over-irrigation in low-lying delta regions of Bangladesh, saving up to 40% of fuel costs for water pumps while ensuring the roots never hit a "wilting point."
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. NPK Sensor */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
+                <i className="fas fa-flask-vial text-xl"></i>
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900">Electrochemical Nutrient Profiling</h2>
+            </div>
+            <p className="text-lg text-slate-600 mb-6 leading-relaxed">
+              The NPK sensor is the heart of our hardware. It uses <strong>Ion-Selective Electrodes (ISE)</strong> to detect Nitrogen (N), Phosphorus (P), and Potassium (K) ions within the soil solution.
+            </p>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <h4 className="font-bold text-slate-800 mb-2 italic">How it works in the field:</h4>
+                <p className="text-sm text-slate-600">
+                  In a real field environment, nutrients aren't distributed evenly. Our sensors calculate the "Plant Available" NPK by measuring the electrical conductivity of specific ions. This tells the farmer exactly how many kg of Urea or DAP to apply per bigha, preventing the leaching of expensive fertilizers into the groundwater.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="order-1 lg:order-2">
+            <img 
+              src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=1200&auto=format&fit=crop" 
+              className="rounded-[3rem] shadow-2xl border-8 border-white hover:scale-105 transition-transform duration-500" 
+              alt="NPK Sensor" 
+            />
+          </div>
+        </section>
+
+        {/* 4. pH Sensor */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <img 
+              src="https://images.unsplash.com/photo-1576086213369-97a306d36557?q=80&w=1200&auto=format&fit=crop" 
+              className="rounded-[3rem] shadow-2xl border-8 border-white hover:scale-105 transition-transform duration-500" 
+              alt="pH Sensor" 
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center">
+                <i className="fas fa-vial text-xl"></i>
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900">Acidity & Alkalinity Balance</h2>
+            </div>
+            <p className="text-lg text-slate-600 mb-6 leading-relaxed">
+              Our pH sensors consist of a <strong>Glass Measuring Electrode</strong> and a <strong>Reference Electrode</strong>. It measures the potential difference generated by hydrogen ions across the glass membrane.
+            </p>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <h4 className="font-bold text-slate-800 mb-2 italic">How it works in the field:</h4>
+                <p className="text-sm text-slate-600">
+                  Soil pH determines "Nutrient Availability." If the soil is too acidic (common in red soil areas) or too alkaline, even if you add fertilizer, the plant cannot absorb it. In the field, our real-time pH monitoring alerts farmers if they need to apply lime to reduce acidity or sulfur to reduce alkalinity, ensuring the soil stays in the "Golden Zone" of 6.0–7.5 pH.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      {/* Technical Summary */}
+      <section className="bg-slate-900 py-24 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl font-bold text-white mb-12">Integrated Intelligence</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
+              <i className="fas fa-microchip text-emerald-400 text-3xl mb-4"></i>
+              <h4 className="text-white font-bold mb-2">LoRaWAN Mesh</h4>
+              <p className="text-slate-400 text-sm">Data travels up to 10km across your farm with ultra-low power consumption.</p>
+            </div>
+            <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
+              <i className="fas fa-shield-halved text-emerald-400 text-3xl mb-4"></i>
+              <h4 className="text-white font-bold mb-2">Industrial Grade</h4>
+              <p className="text-slate-400 text-sm">IP68 waterproof housing designed to survive monsoon rain and intense heat.</p>
+            </div>
+            <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
+              <i className="fas fa-bolt text-emerald-400 text-3xl mb-4"></i>
+              <h4 className="text-white font-bold mb-2">Solar Powered</h4>
+              <p className="text-slate-400 text-sm">Infinite battery life through integrated high-efficiency PV panels.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Technical CTA */}
-      <section className="bg-emerald-600 py-20 px-4 text-center">
-        <h2 className="text-3xl font-bold text-white mb-10">Ready to modernize your operations?</h2>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all">Get Started Now</button>
-          <button className="bg-white text-emerald-700 px-10 py-4 rounded-2xl font-bold hover:bg-slate-100 transition-all">Contact a Consultant</button>
-        </div>
+      {/* CTA */}
+      <section className="py-20 text-center">
+        <h2 className="text-3xl font-bold text-slate-900 mb-8">Ready to see your field in high definition?</h2>
+        <button className="bg-emerald-600 text-white px-12 py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100">
+          Get Started Now
+        </button>
       </section>
     </div>
   );

@@ -13,14 +13,19 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignup }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate auth
-    onLogin({
-      id: '1',
-      name: 'Kamal Hossain',
-      email: email,
-      subscriptionPlan: 'premium',
-      subscriptionEnd: '2025-12-31'
-    });
+    
+    // Retrieve the registered users from localStorage
+    const registeredUsers = JSON.parse(localStorage.getItem('agricare_registered_users') || '[]');
+    const existingUser = registeredUsers.find((u: User) => u.email.toLowerCase() === email.toLowerCase());
+
+    if (existingUser) {
+      // Simulate successful auth with the actual user data
+      onLogin(existingUser);
+    } else {
+      // If not found, we can either alert or provide a default for demo purposes
+      // But let's be accurate as requested:
+      alert("No account found with this email. Please sign up first to access the dashboard.");
+    }
   };
 
   return (
