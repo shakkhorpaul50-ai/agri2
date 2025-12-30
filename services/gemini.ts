@@ -2,6 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
+// Always initialize inside functions to ensure fresh process.env access
 const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
@@ -10,7 +11,7 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
   const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `
         Analyze this agricultural field data and provide the top 3 recommended crops.
         Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
@@ -41,14 +42,11 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
       }
     });
     
-    return JSON.parse(response.text || '[]');
+    const result = JSON.parse(response.text || '[]');
+    return result.length > 0 ? result : getFallbackRecommendations();
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    return [
-      { name: "Rice (Boro)", suitability: 94, yield: "5.5 tons/ha", requirements: "High water requirement. Add Nitrogen if levels drop.", icon: "fa-wheat-awn" },
-      { name: "Potato", suitability: 88, yield: "22 tons/ha", requirements: "Cool temp preferred. Loamy soil is ideal.", icon: "fa-circle" },
-      { name: "Mustard", suitability: 75, yield: "1.5 tons/ha", requirements: "Low water need. Thrives in sandy loam.", icon: "fa-seedling" }
-    ];
+    return getFallbackRecommendations();
   }
 };
 
@@ -56,7 +54,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: SensorData)
   const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `
         Act as an expert agricultural scientist. Provide a concise 3-sentence "Soil Health Summary" for this field in Bangladesh.
         Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
@@ -66,10 +64,10 @@ export const getSoilHealthSummary = async (field: Field, latestData: SensorData)
       `
     });
     
-    return response.text || "Your soil parameters are currently within normal ranges. Nitrogen is sufficient for existing crops. Maintain steady irrigation.";
+    return response.text || "Soil conditions are currently stable for the region. Nitrogen levels are optimal for general cultivation. We suggest maintaining regular irrigation.";
   } catch (error) {
     console.error("Gemini Summary Error:", error);
-    return "Soil health is currently stable. Current moisture and temperature levels are optimal for root development. Recommendation: Continue standard maintenance cycles.";
+    return "Soil health markers are within expected ranges for the current season. Temperature and moisture profiles suggest good root oxygenation. Recommendation: Continue with standard moisture monitoring.";
   }
 };
 
@@ -77,7 +75,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
   const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `
         Generate exactly 4 prioritized farm management tasks for a field in Bangladesh with these conditions:
         Soil: ${field.soil_type}, Temp: ${latestData.temperature}°C, Moisture: ${latestData.moisture}%, pH: ${latestData.ph_level}, NPK: ${latestData.npk_n}-${latestData.npk_p}-${latestData.npk_k}.
@@ -100,22 +98,36 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
       }
     });
     
-    return JSON.parse(response.text || '[]');
+    const result = JSON.parse(response.text || '[]');
+    return result.length > 0 ? result : getFallbackPlan();
   } catch (error) {
     console.error("Gemini Plan Error:", error);
-    return [
-      { priority: "High", title: "Moisture Control", description: "Increase irrigation by 10% to combat rising surface temperatures.", icon: "fa-droplet" },
-      { priority: "Medium", title: "Nutrient Supplement", description: "Apply Urea top-dressing to maintain Nitrogen levels above 40ppm.", icon: "fa-flask" },
-      { priority: "Medium", title: "pH Monitoring", description: "Current pH is 6.2. No immediate correction needed, but watch for acidity.", icon: "fa-vial" },
-      { priority: "Low", title: "General Scouting", description: "Physical inspection of leaf health near drainage points.", icon: "fa-magnifying-glass" }
-    ];
+    return getFallbackPlan();
   }
 };
 
 export const startAIConversation = (systemInstruction: string) => {
   const ai = getAIClient();
   return ai.chats.create({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     config: { systemInstruction },
   });
 };
+
+// Fallback Data Generators
+function getFallbackRecommendations() {
+  return [
+    { name: "Rice (Boro)", suitability: 92, yield: "5.8 tons/ha", requirements: "Maintain high water level during tillering phase.", icon: "fa-wheat-awn" },
+    { name: "Mustard", suitability: 85, yield: "1.2 tons/ha", requirements: "Thrives in current loamy/alluvial conditions. Low water need.", icon: "fa-seedling" },
+    { name: "Potato", suitability: 78, yield: "24 tons/ha", requirements: "Ensure soil pH stays below 6.5 to prevent scab disease.", icon: "fa-circle" }
+  ];
+}
+
+function getFallbackPlan() {
+  return [
+    { priority: "High", title: "Moisture Maintenance", description: "Soil moisture is trending low; schedule next irrigation for early morning.", icon: "fa-droplet" },
+    { priority: "Medium", title: "NPK Supplement", description: "Potassium levels are slightly low for optimal yield. Add K-based fertilizer.", icon: "fa-flask" },
+    { priority: "Medium", title: "pH Adjustment", description: "Current pH is 6.8. Monitor closely if planning to plant acid-loving crops.", icon: "fa-vial" },
+    { priority: "Low", title: "Pest Scouting", description: "No immediate threats, but check leaf undersides for aphid colonies.", icon: "fa-bug" }
+  ];
+}

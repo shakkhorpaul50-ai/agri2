@@ -66,6 +66,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     );
     
     try {
+      // Using Promise.all to fetch all AI insights simultaneously
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, latest),
         getSoilHealthSummary(field, latest),
@@ -213,8 +214,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
                         <i className="fas fa-dna text-emerald-600"></i> AI Soil Health Insight
                       </h3>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
-                        {aiSummary}
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium min-h-[80px]">
+                        {aiSummary || "Processing field conditions... recommendations will appear shortly."}
                       </p>
                     </div>
 
@@ -224,21 +225,28 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-seedling text-emerald-600"></i> Crop Suitability Index
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {recommendations?.map((crop, i) => (
-                          <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all group">
-                            <div className="flex justify-between items-start mb-6">
-                              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-inner">
-                                <i className={`fas ${crop.icon} text-2xl`}></i>
+                        {recommendations && recommendations.length > 0 ? (
+                          recommendations.map((crop, i) => (
+                            <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all group">
+                              <div className="flex justify-between items-start mb-6">
+                                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-inner">
+                                  <i className={`fas ${crop.icon} text-2xl`}></i>
+                                </div>
+                                <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full shadow-sm">{crop.suitability}% Match</span>
                               </div>
-                              <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full shadow-sm">{crop.suitability}% Match</span>
+                              <h4 className="text-xl font-bold text-slate-900 mb-1">{crop.name}</h4>
+                              <div className="inline-flex items-center gap-2 px-2 py-0.5 bg-slate-50 rounded text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-4">
+                                <i className="fas fa-chart-line text-[8px]"></i> Forecast: {crop.yield}
+                              </div>
+                              <p className="text-sm text-slate-600 leading-relaxed border-t border-slate-50 pt-4">{crop.requirements}</p>
                             </div>
-                            <h4 className="text-xl font-bold text-slate-900 mb-1">{crop.name}</h4>
-                            <div className="inline-flex items-center gap-2 px-2 py-0.5 bg-slate-50 rounded text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-4">
-                              <i className="fas fa-chart-line text-[8px]"></i> Forecast: {crop.yield}
-                            </div>
-                            <p className="text-sm text-slate-600 leading-relaxed border-t border-slate-50 pt-4">{crop.requirements}</p>
+                          ))
+                        ) : (
+                          <div className="col-span-full bg-white p-12 rounded-[2rem] border border-dashed border-slate-200 text-center text-slate-400">
+                             <i className="fas fa-robot mb-4 text-2xl animate-pulse"></i>
+                             <p>Analyzing localized soil markers for crop compatibility...</p>
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                   </div>
@@ -251,21 +259,28 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       </h3>
                       
                       <div className="space-y-6">
-                        {managementPlan?.map((task, i) => (
-                          <div key={i} className="relative pl-6 group">
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-100 group-hover:bg-emerald-200 rounded-full transition-colors"></div>
-                            <div className="flex justify-between items-center mb-2">
-                              <div className={`text-[10px] font-bold uppercase tracking-widest ${
-                                task.priority === 'High' ? 'text-red-600' : 'text-emerald-600'
-                              }`}>
-                                {task.priority} Priority
+                        {managementPlan && managementPlan.length > 0 ? (
+                          managementPlan.map((task, i) => (
+                            <div key={i} className="relative pl-6 group">
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-100 group-hover:bg-emerald-200 rounded-full transition-colors"></div>
+                              <div className="flex justify-between items-center mb-2">
+                                <div className={`text-[10px] font-bold uppercase tracking-widest ${
+                                  task.priority === 'High' ? 'text-red-600' : 'text-emerald-600'
+                                }`}>
+                                  {task.priority} Priority
+                                </div>
+                                <i className={`fas ${task.icon} text-slate-300`}></i>
                               </div>
-                              <i className={`fas ${task.icon} text-slate-300`}></i>
+                              <h4 className="font-bold text-slate-900 text-sm mb-1">{task.title}</h4>
+                              <p className="text-xs text-slate-500 leading-relaxed">{task.description}</p>
                             </div>
-                            <h4 className="font-bold text-slate-900 text-sm mb-1">{task.title}</h4>
-                            <p className="text-xs text-slate-500 leading-relaxed">{task.description}</p>
+                          ))
+                        ) : (
+                          <div className="text-center py-10">
+                            <i className="fas fa-robot text-2xl text-slate-300 mb-4 animate-bounce"></i>
+                            <p className="text-xs text-slate-400">Preparing actionable insights...</p>
                           </div>
-                        ))}
+                        )}
                       </div>
                       
                       <div className="mt-10 p-5 bg-slate-900 rounded-[1.5rem] text-white text-center shadow-xl shadow-slate-200">
