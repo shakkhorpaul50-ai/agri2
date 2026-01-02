@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Field, SensorData, CropRecommendation } from '../../types';
 import { generateMockSensorData } from '../../constants';
-import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, startAIConversation } from '../../services/gemini';
+import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, startAIConversation, checkAIConnection } from '../../services/gemini';
 import { GenerateContentResponse } from "@google/genai";
 
 interface ManagementTask {
@@ -25,6 +25,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [aiConnected, setAiConnected] = useState(true);
   
   // Modal states
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
@@ -44,6 +45,16 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const verifyAI = async () => {
+      const aistudio = (window as any).aistudio;
+      let hasKey = false;
+      if (aistudio) {
+        hasKey = await aistudio.hasSelectedApiKey();
+      }
+      setAiConnected(hasKey || checkAIConnection());
+    };
+    verifyAI();
+
     const saved = localStorage.getItem('agricare_fields');
     if (saved) {
       const allFields: Field[] = JSON.parse(saved);
@@ -58,6 +69,15 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     }
   }, [chatHistory, isBotThinking]);
 
+  const initChat = (field: Field) => {
+    const latest = generateMockSensorData(field.field_id)[6];
+    chatRef.current = startAIConversation(
+      `You are the Agricare AI Advisor. Assist this farmer in ${field.location} with their ${field.field_name} (${field.soil_type} soil).
+       Current Sensor Data: Temp ${latest.temperature.toFixed(1)}°C, Moisture ${latest.moisture.toFixed(1)}%, pH ${latest.ph_level.toFixed(1)}, NPK ${latest.npk_n}-${latest.npk_p}-${latest.npk_k}.
+       Provide expert, localized agricultural advice for Bangladesh.`
+    );
+  };
+
   const handleFieldSelect = async (field: Field) => {
     setSelectedField(field);
     setLoading(true);
@@ -66,14 +86,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setManagementPlan(null);
     setChatHistory([]);
     
-    const latest = generateMockSensorData(field.field_id)[6];
+    // Attempt chat init
+    initChat(field);
     
-    // Initialize Advisor Chat
-    chatRef.current = startAIConversation(
-      `You are the Agricare AI Advisor. Assist this farmer in ${field.location} with their ${field.field_name} (${field.soil_type} soil).
-       Current Sensor Data: Temp ${latest.temperature.toFixed(1)}°C, Moisture ${latest.moisture.toFixed(1)}%, pH ${latest.ph_level.toFixed(1)}, NPK ${latest.npk_n}-${latest.npk_p}-${latest.npk_k}.
-       Provide expert, localized agricultural advice for Bangladesh.`
-    );
+    const latest = generateMockSensorData(field.field_id)[6];
     
     try {
       const [analysis, summary, plan] = await Promise.all([
@@ -103,34 +119,66 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       soil_type: newFieldData.soilType
     };
 
-    // Update Global Storage
     const saved = localStorage.getItem('agricare_fields');
     const allFields: Field[] = saved ? JSON.parse(saved) : [];
-    const updatedGlobalFields = [...allFields, newField];
-    localStorage.setItem('agricare_fields', JSON.stringify(updatedGlobalFields));
+    localStorage.setItem('agricare_fields', JSON.stringify([...allFields, newField]));
 
-    // Update local state
     setFields([...fields, newField]);
     setShowAddFieldModal(false);
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
 
+  const handleConnectAI = async () => {
+    const aistudio = (window as any).aistudio;
+    if (aistudio) {
+      try {
+        await aistudio.openSelectKey();
+        setAiConnected(true);
+        if (selectedField) {
+          initChat(selectedField);
+          // Re-trigger analysis if it failed before
+          handleFieldSelect(selectedField);
+        }
+      } catch (e) {
+        console.error("Failed to connect AI", e);
+      }
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userInput.trim() || !chatRef.current || isBotThinking) return;
+    if (!userInput.trim() || isBotThinking) return;
+
+    // Lazy initialization if it failed initially
+    if (!chatRef.current && selectedField && aiConnected) {
+      initChat(selectedField);
+    }
 
     const userMsg = userInput;
     setUserInput("");
     setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
+
+    if (!chatRef.current) {
+      setChatHistory(prev => [...prev, { 
+        role: 'model', 
+        text: "AI connection is not active. Please connect your API key to talk with the advisor." 
+      }]);
+      return;
+    }
+
     setIsBotThinking(true);
 
     try {
       const response: GenerateContentResponse = await chatRef.current.sendMessage({ message: userMsg });
       const botText = response.text || "I'm having trouble analyzing the latest satellite telemetry. Please try again.";
       setChatHistory(prev => [...prev, { role: 'model', text: botText }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Advisor Error:", error);
-      setChatHistory(prev => [...prev, { role: 'model', text: "Error connecting to AI system. Please verify network." }]);
+      let errorMsg = "Error connecting to AI system. Please verify your network.";
+      if (error.message?.includes("API_KEY_INVALID") || error.message?.includes("403")) {
+        errorMsg = "Your API Key appears to be invalid or restricted. Please reconnect.";
+      }
+      setChatHistory(prev => [...prev, { role: 'model', text: errorMsg }]);
     } finally {
       setIsBotThinking(false);
     }
@@ -223,10 +271,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                      <div className={`w-8 h-8 ${aiConnected ? 'bg-emerald-500' : 'bg-slate-700'} rounded-lg flex items-center justify-center transition-colors`}>
                         <i className="fas fa-robot text-sm"></i>
                       </div>
-                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">AI Advisor Online</span>
+                      <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        {aiConnected ? 'AI Advisor Online' : 'AI Advisor Configuration Required'}
+                      </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
                     <p className="text-slate-400 mt-1">{selectedField.location} • {selectedField.size} Hectares</p>
@@ -257,7 +307,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-dna text-emerald-600"></i> AI Soil Health Insight
                       </h3>
                       <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium min-h-[80px]">
-                        {aiSummary || "Processing field conditions... recommendations will appear shortly."}
+                        {aiConnected ? (aiSummary || "Processing field conditions... recommendations will appear shortly.") : "Connect your AI Key in the Dashboard Overview to unlock deep soil diagnostics."}
                       </p>
                     </div>
 
@@ -420,7 +470,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
       {/* AI Chat Advisor Panel */}
       {isChatOpen && (
-        <div className="fixed inset-0 z-[200] flex justify-end">
+        <div className="fixed inset-0 z-[400] flex justify-end">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsChatOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
             {/* Header */}
@@ -441,7 +491,23 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
             {/* Chat History */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6 scroll-smooth">
-              {chatHistory.length === 0 ? (
+              {!aiConnected ? (
+                <div className="text-center py-20 px-8 flex flex-col items-center">
+                  <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-[2rem] flex items-center justify-center mb-6 border border-amber-100 shadow-inner">
+                    <i className="fas fa-plug text-3xl"></i>
+                  </div>
+                  <h4 className="font-bold text-slate-900 mb-2">Advisor Offline</h4>
+                  <p className="text-sm text-slate-500 leading-relaxed mb-8">
+                    To access real-time diagnostic support and localized crop advice, you must connect a valid Gemini API key.
+                  </p>
+                  <button 
+                    onClick={handleConnectAI}
+                    className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95"
+                  >
+                    <i className="fas fa-key"></i> Connect Gemini AI
+                  </button>
+                </div>
+              ) : chatHistory.length === 0 ? (
                 <div className="text-center py-20 px-6">
                   <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
                     <i className="fas fa-comment-dots text-3xl"></i>
@@ -476,18 +542,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
             </div>
 
             {/* Input Bar */}
-            <div className="p-8 border-t border-slate-100 bg-slate-50">
+            <div className={`p-8 border-t border-slate-100 bg-slate-50 ${!aiConnected ? 'opacity-40 pointer-events-none' : ''}`}>
               <form onSubmit={handleSendMessage} className="flex gap-3">
                 <input 
                   type="text" 
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
-                  placeholder="Ask advisor..."
+                  placeholder={aiConnected ? "Ask advisor..." : "Connect AI to chat..."}
                   className="flex-1 bg-white border border-slate-200 rounded-[1.5rem] px-6 py-4 text-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 shadow-inner"
+                  disabled={!aiConnected}
                 />
                 <button 
                   type="submit"
-                  disabled={isBotThinking || !userInput.trim()}
+                  disabled={isBotThinking || !userInput.trim() || !aiConnected}
                   className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-200 active:scale-95"
                 >
                   <i className="fas fa-paper-plane text-lg"></i>

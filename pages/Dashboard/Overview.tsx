@@ -4,9 +4,6 @@ import { User, Field } from '../../types';
 import { generateMockSensorData } from '../../constants';
 import { getLiveWeatherAlert, checkAIConnection } from '../../services/gemini';
 
-// The aistudio object is provided globally by the host environment.
-// Redefining it here caused a conflict with the existing AIStudio type in the global scope.
-
 interface LiveWeather {
   location: string;
   text: string;
@@ -24,17 +21,14 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [weatherAlerts, setWeatherAlerts] = useState<LiveWeather[]>([]);
   
   useEffect(() => {
-    // Check connection using the globally available aistudio helper
     const verifyConnection = async () => {
-      // Access aistudio via window casting to bypass conflicting global interface definitions
       const aistudio = (window as any).aistudio;
+      let hasKey = false;
       if (aistudio) {
-        const hasKey = await aistudio.hasSelectedApiKey();
-        const envKey = checkAIConnection();
-        setAiConnected(hasKey || envKey);
-      } else {
-        setAiConnected(checkAIConnection());
+        hasKey = await aistudio.hasSelectedApiKey();
       }
+      const envKey = checkAIConnection();
+      setAiConnected(hasKey || envKey);
     };
 
     verifyConnection();
@@ -47,7 +41,6 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
       const snapshotFields = userFields.slice(0, 2);
       setLatestFields(snapshotFields);
       
-      // Attempt weather fetch if we think we are connected
       if (snapshotFields.length > 0) {
         fetchWeather(snapshotFields);
       }
@@ -55,6 +48,10 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   }, [user.id]);
 
   const fetchWeather = async (fields: Field[]) => {
+    if (!checkAIConnection() && !((window as any).aistudio && await (window as any).aistudio.hasSelectedApiKey())) {
+      return;
+    }
+
     setLoadingWeather(true);
     const uniqueLocations = Array.from(new Set(fields.map(f => f.location)));
     
@@ -78,20 +75,17 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleConnectAI = async () => {
-    try {
-      // Access aistudio via window casting to bypass conflicting global interface definitions
-      const aistudio = (window as any).aistudio;
-      if (aistudio) {
+    const aistudio = (window as any).aistudio;
+    if (aistudio) {
+      try {
         await aistudio.openSelectKey();
-        // Assume success after dialog opens as per guidelines to avoid race conditions
         setAiConnected(true);
-        // Re-trigger weather fetch
         if (latestFields.length > 0) {
           fetchWeather(latestFields);
         }
+      } catch (e) {
+        console.error("Failed to open key selector", e);
       }
-    } catch (e) {
-      console.error("Failed to open key selector", e);
     }
   };
 
@@ -103,13 +97,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
 
   const handleUpdateSchedules = () => {
     setIsUpdating(true);
-    const steps = [
-      'Analyzing recent weather patterns...',
-      'Calculating evaporation rates...',
-      'Optimizing irrigation cycles...',
-      'Finalizing management plan...'
-    ];
-
+    const steps = ['Analyzing patterns...', 'Calculating rates...', 'Optimizing cycles...'];
     let currentStep = 0;
     const interval = setInterval(() => {
       if (currentStep < steps.length) {
@@ -119,7 +107,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
         clearInterval(interval);
         setIsUpdating(false);
         setUpdateStep('');
-        alert("Success! Schedules updated based on the latest monsoon data. You can view the new prescriptions in the Management Hub.");
+        alert("Schedules updated successfully.");
       }
     }, 800);
   };
@@ -127,19 +115,28 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {!aiConnected && (
-        <div className="mb-6 bg-emerald-900 border border-emerald-700 p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 text-white shadow-xl animate-in slide-in-from-top-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
-              <i className="fas fa-robot text-2xl text-emerald-400"></i>
+        <div className="mb-8 bg-slate-900 border border-emerald-500/30 p-8 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8 text-white shadow-2xl animate-in slide-in-from-top-4">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0">
+              <i className="fas fa-robot text-3xl text-emerald-400"></i>
             </div>
-            <div className="text-sm">
-              <span className="font-bold block text-base mb-1">AI Link Not Found</span>
-              To enable real-time weather grounding and deep-soil diagnostics, please connect your Gemini API Key.
+            <div>
+              <h3 className="font-black text-xl mb-2 flex items-center gap-2">
+                AI Link Configuration Required
+                <span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+              </h3>
+              <div className="text-sm text-slate-400 space-y-2">
+                <p>To enable real-time weather and crop diagnostics on your live site:</p>
+                <ol className="list-decimal ml-4 space-y-1 text-xs text-slate-300">
+                  <li>Get a key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-emerald-400 font-bold hover:underline">Google AI Studio</a>.</li>
+                  <li>Click <strong>Connect Gemini AI</strong> and paste your key.</li>
+                </ol>
+              </div>
             </div>
           </div>
           <button 
             onClick={handleConnectAI}
-            className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95 whitespace-nowrap"
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-lg transition-all active:scale-95 whitespace-nowrap"
           >
             <i className="fas fa-key"></i> Connect Gemini AI
           </button>
@@ -148,8 +145,8 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
 
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user.name}</h1>
-          <p className="text-slate-500 text-sm">Here's what's happening on your farm today.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 text-sm">Farm status for {user.name}.</p>
         </div>
         <div className="flex gap-4">
           <div className={`px-4 py-2 rounded-lg text-right border ${aiConnected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'}`}>
@@ -158,108 +155,67 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
               {aiConnected ? 'Active' : 'Unconfigured'}
             </span>
           </div>
-          <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-lg text-right">
-            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block">Subscription</span>
-            <span className="text-sm font-bold text-emerald-900 capitalize">{user.subscriptionPlan}</span>
-          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
               <div className="text-slate-500 text-sm mb-1">Active Fields</div>
               <div className="text-3xl font-bold text-slate-900">{fieldCount}</div>
-              <div className="text-xs text-emerald-600 mt-2 font-medium">
-                <i className="fas fa-chart-line mr-1"></i> Data-linked fields
-              </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
               <div className="text-slate-500 text-sm mb-1">Average Health</div>
               <div className="text-3xl font-bold text-emerald-600">88%</div>
-              <div className="text-xs text-slate-400 mt-2 font-medium">Optimal conditions</div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
               <div className="text-slate-500 text-sm mb-1">Yield Forecast</div>
               <div className="text-3xl font-bold text-slate-900">+12%</div>
-              <div className="text-xs text-emerald-600 mt-2 font-medium">Trending upwards</div>
             </div>
           </div>
 
-          {/* Field Snapshot */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-900">Recent Field Snapshots</h3>
+              <h3 className="font-bold text-slate-900">Recent Snapshots</h3>
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {latestFields.length > 0 ? latestFields.map(f => {
+              {latestFields.map(f => {
                 const data = generateMockSensorData(f.field_id)[6];
                 return (
                   <div key={f.field_id} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="font-bold text-slate-800 mb-3 truncate">{f.field_name}</div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs text-slate-500">Soil Moisture</span>
-                      <span className="text-xs font-bold text-slate-900">{data.moisture.toFixed(1)}%</span>
+                    <div className="flex justify-between items-center mb-2 text-xs">
+                      <span className="text-slate-500">Moisture</span>
+                      <span className="font-bold">{data.moisture.toFixed(1)}%</span>
                     </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
                       <div className="h-full bg-blue-500" style={{ width: `${data.moisture}%` }}></div>
                     </div>
                   </div>
                 );
-              }) : (
-                <div className="col-span-2 text-center py-10 text-slate-400">
-                   <p className="text-sm italic">No fields configured yet.</p>
-                </div>
-              )}
+              })}
             </div>
           </div>
         </div>
 
         <div className="space-y-8">
-          {/* Real-time Weather Alerts Card */}
           <div className="bg-emerald-900 text-white p-6 rounded-[2rem] shadow-xl relative overflow-hidden flex flex-col min-h-[400px]">
             <div className="relative z-10 flex-1">
               <h3 className="font-bold mb-6 flex items-center gap-3 text-emerald-400">
-                <i className="fas fa-satellite-dish animate-pulse"></i> Live Agri-Weather Alerts
+                <i className="fas fa-satellite-dish"></i> Live Agri-Weather
               </h3>
               
               {loadingWeather ? (
                 <div className="space-y-4 animate-pulse">
                   <div className="h-24 bg-white/5 rounded-2xl"></div>
-                  <div className="h-24 bg-white/5 rounded-2xl"></div>
                 </div>
               ) : weatherAlerts.length > 0 ? (
-                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
+                <div className="space-y-4 max-h-[400px] overflow-y-auto">
                   {weatherAlerts.map((alert, idx) => (
-                    <div key={idx} className="p-4 bg-white/10 rounded-2xl backdrop-blur-sm border border-white/10">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">{alert.location}</div>
-                        <i className="fas fa-cloud-sun-rain text-emerald-500/50"></i>
-                      </div>
+                    <div key={idx} className="p-4 bg-white/10 rounded-2xl border border-white/10">
+                      <div className="text-[10px] font-black uppercase text-emerald-300 mb-1">{alert.location}</div>
                       <div className="text-sm leading-relaxed text-emerald-50">{alert.text}</div>
-                      
-                      {/* Grounding Citations */}
-                      {alert.sources.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                          <div className="text-[9px] font-bold text-emerald-400/60 uppercase mb-2">Data Verified Via:</div>
-                          <div className="flex flex-wrap gap-2">
-                            {alert.sources.slice(0, 3).map((chunk, cIdx) => (
-                              <a 
-                                key={cIdx}
-                                href={chunk.web?.uri || '#'} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md text-emerald-200/70 truncate max-w-[120px]"
-                                title={chunk.web?.title}
-                              >
-                                {chunk.web?.title || 'Weather Source'}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -267,54 +223,26 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
                 <div className="text-center py-12 px-6">
                   <i className="fas fa-sun text-4xl text-emerald-500/30 mb-4"></i>
                   <p className="text-xs text-emerald-100/50 italic">
-                    {aiConnected ? 'Gathering localized weather insights...' : 'Connect AI to unlock real-time weather grounding.'}
+                    {aiConnected ? 'Connect sensors to fetch localized weather.' : 'Connect AI to unlock weather grounding.'}
                   </p>
-                  {!aiConnected && (
-                    <button 
-                      onClick={handleConnectAI}
-                      className="mt-4 text-[10px] font-bold text-emerald-400 underline decoration-emerald-500/20"
-                    >
-                      Connect API Key
-                    </button>
-                  )}
                 </div>
               )}
             </div>
 
             <div className="mt-6 pt-6 border-t border-white/5 relative z-10">
-              <button 
-                onClick={handleUpdateSchedules}
-                disabled={isUpdating}
-                className={`w-full py-4 rounded-2xl text-sm font-black transition-all flex flex-col items-center justify-center gap-1 ${
-                  isUpdating ? 'bg-emerald-700 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-950/20 active:scale-95'
-                }`}
-              >
-                {isUpdating ? (
-                  <>
-                    <div className="flex items-center gap-2"><i className="fas fa-cog fa-spin"></i> Resynchronizing...</div>
-                    <div className="text-[10px] opacity-60 font-normal">{updateStep}</div>
-                  </>
-                ) : (
-                  'Recalculate Water Loads'
-                )}
+              <button onClick={handleUpdateSchedules} disabled={isUpdating} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl text-sm font-black text-slate-900 transition-all">
+                {isUpdating ? updateStep : 'Recalculate Water'}
               </button>
             </div>
-            <i className="fas fa-wind absolute -bottom-8 -right-8 text-9xl text-white/5 pointer-events-none"></i>
           </div>
 
-          {/* Activity Log */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <h3 className="font-bold text-slate-900 mb-6">Recent Notifications</h3>
+            <h3 className="font-bold text-slate-900 mb-6">Notifications</h3>
             <div className="space-y-6">
               {alerts.map((a, i) => (
                 <div key={i} className="flex gap-4">
-                  <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
-                    a.type === 'warning' ? 'bg-orange-500' : a.type === 'danger' ? 'bg-red-500' : 'bg-blue-500'
-                  }`}></div>
-                  <div>
-                    <div className="text-sm text-slate-800 font-medium leading-snug">{a.text}</div>
-                    <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">{a.time}</div>
-                  </div>
+                  <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${a.type === 'warning' ? 'bg-orange-500' : 'bg-blue-500'}`}></div>
+                  <div className="text-sm text-slate-800 font-medium leading-snug">{a.text}</div>
                 </div>
               ))}
             </div>

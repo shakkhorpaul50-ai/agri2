@@ -2,17 +2,29 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
-// Always create a new instance right before use to ensure the latest API key is used
-const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API_KEY is not configured.");
+/**
+ * Safely checks if the API_KEY is available in the environment.
+ */
+export const checkAIConnection = () => {
+  try {
+    // Check both standard process.env and a direct check for the key string
+    return !!(typeof process !== 'undefined' && process.env && process.env.API_KEY);
+  } catch (e) {
+    return false;
   }
-  return new GoogleGenAI({ apiKey });
 };
 
-export const checkAIConnection = () => {
-  return !!process.env.API_KEY;
+/**
+ * Creates a new GoogleGenAI client. 
+ * Per guidelines, we create a new instance right before use to ensure 
+ * it picks up the latest key from the selection dialog.
+ */
+const getAIClient = () => {
+  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  if (!apiKey) {
+    throw new Error("API_KEY_MISSING");
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 export const getLiveWeatherAlert = async (location: string) => {
@@ -30,10 +42,12 @@ export const getLiveWeatherAlert = async (location: string) => {
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     
     return { text, sources };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Weather Error:", error);
     return { 
-      text: `Weather data for ${location} is temporarily unavailable. Local monsoon patterns suggest standard seasonal monitoring.`, 
+      text: error.message === "API_KEY_MISSING" 
+        ? "AI configuration required for live weather updates." 
+        : `Weather data for ${location} is temporarily unavailable.`, 
       sources: [] 
     };
   }
@@ -145,7 +159,7 @@ export const startAIConversation = (systemInstruction: string) => {
       model: 'gemini-3-flash-preview',
       config: { systemInstruction },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("Failed to start chat session", e);
     return null;
   }
