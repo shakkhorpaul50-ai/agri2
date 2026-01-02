@@ -7,11 +7,35 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
+export const getLiveWeatherAlert = async (location: string) => {
+  const ai = getAIClient();
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `What is the current weather forecast and any active agricultural weather alerts for ${location}, Bangladesh today? Provide a concise summary for a farmer.`,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const text = response.text || "No active alerts for this region.";
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    
+    return { text, sources };
+  } catch (error) {
+    console.error("Gemini Weather Error:", error);
+    return { 
+      text: `Weather data for ${location} is temporarily unavailable. Local monsoon patterns suggest standard seasonal monitoring.`, 
+      sources: [] 
+    };
+  }
+};
+
 export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
   const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3-pro-preview",
       contents: `
         Analyze this agricultural field data and provide the top 3 recommended crops.
         Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
@@ -54,7 +78,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: SensorData)
   const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3-flash-preview",
       contents: `
         Act as an expert agricultural scientist. Provide a concise 3-sentence "Soil Health Summary" for this field in Bangladesh.
         Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
@@ -75,7 +99,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
   const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3-pro-preview",
       contents: `
         Generate exactly 4 prioritized farm management tasks for a field in Bangladesh with these conditions:
         Soil: ${field.soil_type}, Temp: ${latestData.temperature}°C, Moisture: ${latestData.moisture}%, pH: ${latestData.ph_level}, NPK: ${latestData.npk_n}-${latestData.npk_p}-${latestData.npk_k}.
@@ -109,7 +133,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
 export const startAIConversation = (systemInstruction: string) => {
   const ai = getAIClient();
   return ai.chats.create({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-flash-preview',
     config: { systemInstruction },
   });
 };

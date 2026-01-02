@@ -2,6 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { User, Field } from '../../types';
 import { generateMockSensorData } from '../../constants';
+import { getLiveWeatherAlert } from '../../services/gemini';
+
+interface LiveWeather {
+  location: string;
+  text: string;
+  sources: any[];
+}
 
 const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -9,16 +16,47 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [fieldCount, setFieldCount] = useState(0);
   const [latestFields, setLatestFields] = useState<Field[]>([]);
   
+  const [loadingWeather, setLoadingWeather] = useState(false);
+  const [weatherAlerts, setWeatherAlerts] = useState<LiveWeather[]>([]);
+  
   useEffect(() => {
     const savedFields = localStorage.getItem('agricare_fields');
     if (savedFields) {
       const allFields: Field[] = JSON.parse(savedFields);
-      // Filter to only show this user's fields
       const userFields = allFields.filter(f => f.user_id === user.id);
       setFieldCount(userFields.length);
-      setLatestFields(userFields.slice(0, 2));
+      const snapshotFields = userFields.slice(0, 2);
+      setLatestFields(snapshotFields);
+      
+      // Fetch Real-time Weather Alerts for unique locations
+      if (snapshotFields.length > 0) {
+        fetchWeather(snapshotFields);
+      }
     }
   }, [user.id]);
+
+  const fetchWeather = async (fields: Field[]) => {
+    setLoadingWeather(true);
+    const uniqueLocations = Array.from(new Set(fields.map(f => f.location)));
+    
+    try {
+      const alerts = await Promise.all(
+        uniqueLocations.map(async (loc) => {
+          const result = await getLiveWeatherAlert(loc);
+          return {
+            location: loc,
+            text: result.text,
+            sources: result.sources
+          };
+        })
+      );
+      setWeatherAlerts(alerts);
+    } catch (err) {
+      console.error("Failed to load live weather", err);
+    } finally {
+      setLoadingWeather(false);
+    }
+  };
 
   const alerts = [
     { type: 'warning', text: 'Low moisture detected in your primary plots.', time: '2h ago' },
@@ -116,34 +154,78 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
         </div>
 
         <div className="space-y-8">
-          {/* Weather Alerts */}
-          <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-            <div className="relative z-10">
-              <h3 className="font-bold mb-4 flex items-center gap-2 text-emerald-400">
-                <i className="fas fa-cloud-bolt"></i> Weather Alert
+          {/* Real-time Weather Alerts Card */}
+          <div className="bg-emerald-900 text-white p-6 rounded-[2rem] shadow-xl relative overflow-hidden flex flex-col min-h-[400px]">
+            <div className="relative z-10 flex-1">
+              <h3 className="font-bold mb-6 flex items-center gap-3 text-emerald-400">
+                <i className="fas fa-satellite-dish animate-pulse"></i> Live Agri-Weather Alerts
               </h3>
-              <div className="p-4 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10 mb-4">
-                <div className="text-sm font-bold mb-1">Monsoon Rain Predicted</div>
-                <div className="text-xs text-emerald-200">Expect heavy rainfall in the next 12h. Our AI recommends shifting irrigation cycles.</div>
-              </div>
+              
+              {loadingWeather ? (
+                <div className="space-y-4 animate-pulse">
+                  <div className="h-24 bg-white/5 rounded-2xl"></div>
+                  <div className="h-24 bg-white/5 rounded-2xl"></div>
+                </div>
+              ) : weatherAlerts.length > 0 ? (
+                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
+                  {weatherAlerts.map((alert, idx) => (
+                    <div key={idx} className="p-4 bg-white/10 rounded-2xl backdrop-blur-sm border border-white/10">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">{alert.location}</div>
+                        <i className="fas fa-cloud-sun-rain text-emerald-500/50"></i>
+                      </div>
+                      <div className="text-sm leading-relaxed text-emerald-50">{alert.text}</div>
+                      
+                      {/* Grounding Citations */}
+                      {alert.sources.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-white/10">
+                          <div className="text-[9px] font-bold text-emerald-400/60 uppercase mb-2">Data Verified Via:</div>
+                          <div className="flex flex-wrap gap-2">
+                            {alert.sources.slice(0, 3).map((chunk, cIdx) => (
+                              <a 
+                                key={cIdx}
+                                href={chunk.web?.uri || '#'} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md text-emerald-200/70 truncate max-w-[120px]"
+                                title={chunk.web?.title}
+                              >
+                                {chunk.web?.title || 'Weather Source'}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-6">
+                  <i className="fas fa-sun text-4xl text-emerald-500/30 mb-4"></i>
+                  <p className="text-xs text-emerald-100/50 italic">No fields detected to fetch localized weather data.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-white/5 relative z-10">
               <button 
                 onClick={handleUpdateSchedules}
                 disabled={isUpdating}
-                className={`w-full py-3 rounded-xl text-sm font-bold transition-all flex flex-col items-center justify-center gap-1 ${
-                  isUpdating ? 'bg-emerald-700 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-950/20'
+                className={`w-full py-4 rounded-2xl text-sm font-black transition-all flex flex-col items-center justify-center gap-1 ${
+                  isUpdating ? 'bg-emerald-700 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-950/20 active:scale-95'
                 }`}
               >
                 {isUpdating ? (
                   <>
-                    <div className="flex items-center gap-2"><i className="fas fa-spinner fa-spin"></i> Optimizing...</div>
+                    <div className="flex items-center gap-2"><i className="fas fa-cog fa-spin"></i> Resynchronizing...</div>
                     <div className="text-[10px] opacity-60 font-normal">{updateStep}</div>
                   </>
                 ) : (
-                  'Update Schedules'
+                  'Recalculate Water Loads'
                 )}
               </button>
             </div>
-            <i className="fas fa-cloud-rain absolute -bottom-4 -right-4 text-8xl text-white/5 pointer-events-none"></i>
+            <i className="fas fa-wind absolute -bottom-8 -right-8 text-9xl text-white/5 pointer-events-none"></i>
           </div>
 
           {/* Activity Log */}
