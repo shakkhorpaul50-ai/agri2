@@ -2,14 +2,32 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
-// Always initialize inside functions to ensure fresh process.env access
+// Helper to safely access process.env in various deployment environments
+const getApiKey = () => {
+  try {
+    // Standard approach as per requirements
+    return process.env.API_KEY;
+  } catch (e) {
+    console.warn("Agricare: process.env is not defined. Ensure your build tool or platform injects API_KEY.");
+    return undefined;
+  }
+};
+
 const getAIClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("Agricare API Key missing. Please check your deployment environment variables.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+export const checkAIConnection = () => {
+  return !!getApiKey();
 };
 
 export const getLiveWeatherAlert = async (location: string) => {
-  const ai = getAIClient();
   try {
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `What is the current weather forecast and any active agricultural weather alerts for ${location}, Bangladesh today? Provide a concise summary for a farmer.`,
@@ -32,8 +50,8 @@ export const getLiveWeatherAlert = async (location: string) => {
 };
 
 export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
-  const ai = getAIClient();
   try {
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `
@@ -75,8 +93,8 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
 };
 
 export const getSoilHealthSummary = async (field: Field, latestData: SensorData) => {
-  const ai = getAIClient();
   try {
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
@@ -88,16 +106,16 @@ export const getSoilHealthSummary = async (field: Field, latestData: SensorData)
       `
     });
     
-    return response.text || "Soil conditions are currently stable for the region. Nitrogen levels are optimal for general cultivation. We suggest maintaining regular irrigation.";
+    return response.text || "Soil conditions are currently stable for the region.";
   } catch (error) {
     console.error("Gemini Summary Error:", error);
-    return "Soil health markers are within expected ranges for the current season. Temperature and moisture profiles suggest good root oxygenation. Recommendation: Continue with standard moisture monitoring.";
+    return "Soil health markers are within expected ranges for the current season.";
   }
 };
 
 export const getDetailedManagementPlan = async (field: Field, latestData: SensorData) => {
-  const ai = getAIClient();
   try {
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `
@@ -131,11 +149,16 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
 };
 
 export const startAIConversation = (systemInstruction: string) => {
-  const ai = getAIClient();
-  return ai.chats.create({
-    model: 'gemini-3-flash-preview',
-    config: { systemInstruction },
-  });
+  try {
+    const ai = getAIClient();
+    return ai.chats.create({
+      model: 'gemini-3-flash-preview',
+      config: { systemInstruction },
+    });
+  } catch (e) {
+    console.error("Failed to start chat session", e);
+    return null;
+  }
 };
 
 // Fallback Data Generators

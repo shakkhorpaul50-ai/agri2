@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Field } from '../../types';
 import { generateMockSensorData } from '../../constants';
-import { getLiveWeatherAlert } from '../../services/gemini';
+import { getLiveWeatherAlert, checkAIConnection } from '../../services/gemini';
 
 interface LiveWeather {
   location: string;
@@ -15,11 +15,14 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [updateStep, setUpdateStep] = useState('');
   const [fieldCount, setFieldCount] = useState(0);
   const [latestFields, setLatestFields] = useState<Field[]>([]);
+  const [aiConnected, setAiConnected] = useState(true);
   
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [weatherAlerts, setWeatherAlerts] = useState<LiveWeather[]>([]);
   
   useEffect(() => {
+    setAiConnected(checkAIConnection());
+    
     const savedFields = localStorage.getItem('agricare_fields');
     if (savedFields) {
       const allFields: Field[] = JSON.parse(savedFields);
@@ -28,8 +31,8 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
       const snapshotFields = userFields.slice(0, 2);
       setLatestFields(snapshotFields);
       
-      // Fetch Real-time Weather Alerts for unique locations
-      if (snapshotFields.length > 0) {
+      // Only fetch weather if AI is actually connected
+      if (snapshotFields.length > 0 && checkAIConnection()) {
         fetchWeather(snapshotFields);
       }
     }
@@ -66,7 +69,6 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
 
   const handleUpdateSchedules = () => {
     setIsUpdating(true);
-    
     const steps = [
       'Analyzing recent weather patterns...',
       'Calculating evaporation rates...',
@@ -90,14 +92,31 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {!aiConnected && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 text-amber-800 animate-in slide-in-from-top-4">
+          <i className="fas fa-triangle-exclamation text-xl"></i>
+          <div className="text-sm">
+            <span className="font-bold">AI System Configuration Required:</span> Your deployment environment is missing the <code className="bg-amber-100 px-1 rounded">API_KEY</code>. Live weather and crop diagnostics are currently using localized fallback models.
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user.name}</h1>
           <p className="text-slate-500 text-sm">Here's what's happening on your farm today.</p>
         </div>
-        <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-lg text-right">
-          <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider block">Subscription Plan</span>
-          <span className="text-sm font-bold text-emerald-900 capitalize">{user.subscriptionPlan} • Active</span>
+        <div className="flex gap-4">
+          <div className={`px-4 py-2 rounded-lg text-right border ${aiConnected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'}`}>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">AI Link</span>
+            <span className={`text-xs font-bold ${aiConnected ? 'text-emerald-700' : 'text-slate-400'}`}>
+              {aiConnected ? 'Connected' : 'Offline'}
+            </span>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-lg text-right">
+            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block">Subscription</span>
+            <span className="text-sm font-bold text-emerald-900 capitalize">{user.subscriptionPlan}</span>
+          </div>
         </div>
       </div>
 
@@ -202,7 +221,9 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
               ) : (
                 <div className="text-center py-12 px-6">
                   <i className="fas fa-sun text-4xl text-emerald-500/30 mb-4"></i>
-                  <p className="text-xs text-emerald-100/50 italic">No fields detected to fetch localized weather data.</p>
+                  <p className="text-xs text-emerald-100/50 italic">
+                    {aiConnected ? 'No fields detected to fetch localized weather data.' : 'AI Configuration required to fetch live weather.'}
+                  </p>
                 </div>
               )}
             </div>
