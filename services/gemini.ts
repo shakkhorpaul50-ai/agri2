@@ -6,21 +6,15 @@ import { Field, SensorData } from "../types";
  * Safely checks if the API_KEY is available in the environment.
  */
 export const checkAIConnection = () => {
-  try {
-    // Check both standard process.env and a direct check for the key string
-    return !!(typeof process !== 'undefined' && process.env && process.env.API_KEY);
-  } catch (e) {
-    return false;
-  }
+  return !!process.env.API_KEY;
 };
 
 /**
- * Creates a new GoogleGenAI client. 
- * Per guidelines, we create a new instance right before use to ensure 
- * it picks up the latest key from the selection dialog.
+ * Creates a new GoogleGenAI client instance.
+ * As per guidelines, we create this right before use to ensure it uses the latest key.
  */
 const getAIClient = () => {
-  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error("API_KEY_MISSING");
   }
@@ -45,9 +39,7 @@ export const getLiveWeatherAlert = async (location: string) => {
   } catch (error: any) {
     console.error("Gemini Weather Error:", error);
     return { 
-      text: error.message === "API_KEY_MISSING" 
-        ? "AI configuration required for live weather updates." 
-        : `Weather data for ${location} is temporarily unavailable.`, 
+      text: "Weather data is temporarily unavailable. Local patterns suggest standard seasonal monitoring.", 
       sources: [] 
     };
   }
@@ -157,10 +149,13 @@ export const startAIConversation = (systemInstruction: string) => {
     const ai = getAIClient();
     return ai.chats.create({
       model: 'gemini-3-flash-preview',
-      config: { systemInstruction },
+      config: { 
+        systemInstruction,
+        temperature: 0.7 
+      },
     });
   } catch (e: any) {
-    console.error("Failed to start chat session", e);
+    console.error("Failed to start chat session:", e);
     return null;
   }
 };

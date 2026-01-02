@@ -136,7 +136,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         setAiConnected(true);
         if (selectedField) {
           initChat(selectedField);
-          // Re-trigger analysis if it failed before
           handleFieldSelect(selectedField);
         }
       } catch (e) {
@@ -149,8 +148,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     e.preventDefault();
     if (!userInput.trim() || isBotThinking) return;
 
-    // Lazy initialization if it failed initially
-    if (!chatRef.current && selectedField && aiConnected) {
+    // Check if we need to initialize or re-initialize
+    if (!chatRef.current && selectedField) {
       initChat(selectedField);
     }
 
@@ -161,7 +160,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     if (!chatRef.current) {
       setChatHistory(prev => [...prev, { 
         role: 'model', 
-        text: "AI connection is not active. Please connect your API key to talk with the advisor." 
+        text: "I'm having trouble connecting to the AI Advisor. Please ensure your API key is correctly configured in the Dashboard." 
       }]);
       return;
     }
@@ -170,13 +169,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
     try {
       const response: GenerateContentResponse = await chatRef.current.sendMessage({ message: userMsg });
-      const botText = response.text || "I'm having trouble analyzing the latest satellite telemetry. Please try again.";
+      const botText = response.text || "I'm sorry, I couldn't generate a response. Please try asking in a different way.";
       setChatHistory(prev => [...prev, { role: 'model', text: botText }]);
     } catch (error: any) {
       console.error("Advisor Error:", error);
-      let errorMsg = "Error connecting to AI system. Please verify your network.";
+      let errorMsg = "An error occurred while communicating with the advisor. Please try again later.";
       if (error.message?.includes("API_KEY_INVALID") || error.message?.includes("403")) {
-        errorMsg = "Your API Key appears to be invalid or restricted. Please reconnect.";
+        errorMsg = "Your API Key appears to be invalid or restricted. Please reconnect it from the Dashboard.";
       }
       setChatHistory(prev => [...prev, { role: 'model', text: errorMsg }]);
     } finally {
@@ -275,7 +274,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-robot text-sm"></i>
                       </div>
                       <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {aiConnected ? 'AI Advisor Online' : 'AI Advisor Configuration Required'}
+                        {aiConnected ? 'AI Advisor Online' : 'AI Advisor Offline'}
                       </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
@@ -307,7 +306,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-dna text-emerald-600"></i> AI Soil Health Insight
                       </h3>
                       <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium min-h-[80px]">
-                        {aiConnected ? (aiSummary || "Processing field conditions... recommendations will appear shortly.") : "Connect your AI Key in the Dashboard Overview to unlock deep soil diagnostics."}
+                        {aiSummary || "Soil health markers are being analyzed using current regional telemetry."}
                       </p>
                     </div>
 
@@ -498,7 +497,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                   <h4 className="font-bold text-slate-900 mb-2">Advisor Offline</h4>
                   <p className="text-sm text-slate-500 leading-relaxed mb-8">
-                    To access real-time diagnostic support and localized crop advice, you must connect a valid Gemini API key.
+                    The advisor is currently offline. Please connect your API key to enable specialized agricultural support.
                   </p>
                   <button 
                     onClick={handleConnectAI}
@@ -513,7 +512,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <i className="fas fa-comment-dots text-3xl"></i>
                   </div>
                   <h4 className="font-bold text-slate-900 mb-2">How can I help you today?</h4>
-                  <p className="text-sm text-slate-500 leading-relaxed italic">"What's the best time to apply Urea given current moisture levels?" or "How does the predicted monsoon affect my potato yield?"</p>
+                  <p className="text-sm text-slate-500 leading-relaxed italic">"What's the best time to apply Urea given current moisture levels?" or "How does the predicted monsoon affect my yield?"</p>
                 </div>
               ) : (
                 chatHistory.map((msg, i) => (
@@ -548,7 +547,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   type="text" 
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
-                  placeholder={aiConnected ? "Ask advisor..." : "Connect AI to chat..."}
+                  placeholder={aiConnected ? "Ask advisor..." : "AI Link Required..."}
                   className="flex-1 bg-white border border-slate-200 rounded-[1.5rem] px-6 py-4 text-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 shadow-inner"
                   disabled={!aiConnected}
                 />
