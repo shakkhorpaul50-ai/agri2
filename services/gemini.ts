@@ -2,27 +2,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
-// Helper to safely access process.env in various deployment environments
-const getApiKey = () => {
-  try {
-    // Standard approach as per requirements
-    return process.env.API_KEY;
-  } catch (e) {
-    console.warn("Agricare: process.env is not defined. Ensure your build tool or platform injects API_KEY.");
-    return undefined;
-  }
-};
-
+// Always create a new instance right before use to ensure the latest API key is used
 const getAIClient = () => {
-  const apiKey = getApiKey();
+  const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("Agricare API Key missing. Please check your deployment environment variables.");
+    throw new Error("API_KEY is not configured.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 export const checkAIConnection = () => {
-  return !!getApiKey();
+  return !!process.env.API_KEY;
 };
 
 export const getLiveWeatherAlert = async (location: string) => {
