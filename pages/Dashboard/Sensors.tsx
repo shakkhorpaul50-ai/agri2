@@ -1,27 +1,58 @@
 
 import React, { useState, useEffect } from 'react';
-import { MOCK_FIELDS } from '../../constants';
-import { Sensor } from '../../types';
+import { User, Field, Sensor } from '../../types';
 
-const Sensors: React.FC = () => {
-  // Persistence Layer: Only load from localStorage, default to empty array for new users
-  const [sensors, setSensors] = useState<Sensor[]>(() => {
-    const saved = localStorage.getItem('agricare_sensors');
-    // If it's a new user with no saved data, we return an empty array
-    return saved ? JSON.parse(saved) : [];
-  });
+const Sensors: React.FC<{ user: User }> = ({ user }) => {
+  const [userFields, setUserFields] = useState<Field[]>([]);
+  
+  // Local sensor state filtered for this user
+  const [sensors, setSensors] = useState<Sensor[]>([]);
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSensorForm, setNewSensorForm] = useState({
     type: 'Moisture/Temp',
-    fieldId: MOCK_FIELDS[0]?.field_id.toString() || ''
+    fieldId: ''
   });
 
   useEffect(() => {
-    localStorage.setItem('agricare_sensors', JSON.stringify(sensors));
-  }, [sensors]);
+    // 1. Load User Fields
+    const savedFields = localStorage.getItem('agricare_fields');
+    if (savedFields) {
+      const allFields: Field[] = JSON.parse(savedFields);
+      const filteredFields = allFields.filter(f => f.user_id === user.id);
+      setUserFields(filteredFields);
+      if (filteredFields.length > 0) {
+        setNewSensorForm(prev => ({ ...prev, fieldId: filteredFields[0].field_id.toString() }));
+      }
+    }
+
+    // 2. Load and Filter Sensors
+    const savedSensors = localStorage.getItem('agricare_sensors');
+    if (savedSensors) {
+      const allSensors: Sensor[] = JSON.parse(savedSensors);
+      const userFieldIds = new Set(
+        savedFields 
+          ? JSON.parse(savedFields).filter((f: Field) => f.user_id === user.id).map((f: Field) => f.field_id) 
+          : []
+      );
+      // Filter sensors that belong to the user's fields
+      const filteredSensors = allSensors.filter(s => userFieldIds.has(s.field_id));
+      setSensors(filteredSensors);
+    }
+  }, [user.id]);
 
   const toggleSensor = (id: number) => {
+    const saved = localStorage.getItem('agricare_sensors');
+    const allSensors: Sensor[] = saved ? JSON.parse(saved) : [];
+    
+    const updatedGlobalSensors = allSensors.map(s => {
+      if (s.sensor_id === id) {
+        return { ...s, status: s.status === 'active' ? 'inactive' : 'active' };
+      }
+      return s;
+    });
+
+    localStorage.setItem('agricare_sensors', JSON.stringify(updatedGlobalSensors));
     setSensors(prev => prev.map(s => {
       if (s.sensor_id === id) {
         return { ...s, status: s.status === 'active' ? 'inactive' : 'active' };
@@ -32,12 +63,21 @@ const Sensors: React.FC = () => {
 
   const handleDeleteSensor = (id: number) => {
     if (window.confirm("Remove this sensor from your network?")) {
+      const saved = localStorage.getItem('agricare_sensors');
+      const allSensors: Sensor[] = saved ? JSON.parse(saved) : [];
+      const updatedGlobalSensors = allSensors.filter(s => s.sensor_id !== id);
+      localStorage.setItem('agricare_sensors', JSON.stringify(updatedGlobalSensors));
       setSensors(prev => prev.filter(s => s.sensor_id !== id));
     }
   };
 
   const handleAddSensor = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newSensorForm.fieldId) {
+      alert("Please select a field first.");
+      return;
+    }
+
     const newSensor: Sensor = {
       sensor_id: Math.floor(1000 + Math.random() * 9000),
       field_id: parseInt(newSensorForm.fieldId),
@@ -47,6 +87,12 @@ const Sensors: React.FC = () => {
       last_active: new Date().toISOString()
     };
     
+    // Save to Global Storage
+    const saved = localStorage.getItem('agricare_sensors');
+    const allSensors: Sensor[] = saved ? JSON.parse(saved) : [];
+    localStorage.setItem('agricare_sensors', JSON.stringify([...allSensors, newSensor]));
+
+    // Update local state
     setSensors([newSensor, ...sensors]);
     setShowAddModal(false);
   };
@@ -85,7 +131,7 @@ const Sensors: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sensors.map(sensor => {
-            const field = MOCK_FIELDS.find(f => f.field_id === sensor.field_id);
+            const field = userFields.find(f => f.field_id === sensor.field_id);
             return (
               <div key={sensor.sensor_id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group overflow-hidden">
                 <div className="flex justify-between items-start mb-6">
@@ -161,7 +207,7 @@ const Sensors: React.FC = () => {
                   value={newSensorForm.fieldId} 
                   onChange={e => setNewSensorForm({...newSensorForm, fieldId: e.target.value})}
                 >
-                  {MOCK_FIELDS.map(f => (
+                  {userFields.map(f => (
                     <option key={f.field_id} value={f.field_id}>{f.field_name}</option>
                   ))}
                 </select>

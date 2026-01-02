@@ -58,9 +58,9 @@ const App: React.FC = () => {
       
       // Auth Protected
       case 'dashboard': return isLoggedIn ? <Overview user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
-      case 'management': return isLoggedIn ? <Management /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
+      case 'management': return isLoggedIn ? <Management user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
       case 'fields': return isLoggedIn ? <UserFields user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
-      case 'sensors': return isLoggedIn ? <Sensors /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
+      case 'sensors': return isLoggedIn ? <Sensors user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
       
       default: return <Home onGetStarted={() => setActiveTab('signup')} />;
     }

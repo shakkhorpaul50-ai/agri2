@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Field, SensorData, CropRecommendation } from '../../types';
-import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
+import { generateMockSensorData } from '../../constants';
 import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, startAIConversation } from '../../services/gemini';
 import { GenerateContentResponse } from "@google/genai";
 
@@ -18,17 +18,13 @@ interface ChatMessage {
 }
 
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
-  const [fields, setFields] = useState<Field[]>(() => {
-    const saved = localStorage.getItem('agricare_fields');
-    return saved ? JSON.parse(saved) : MOCK_FIELDS;
-  });
+  const [fields, setFields] = useState<Field[]>([]);
   
   const [selectedField, setSelectedField] = useState<Field | null>(null);
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   
   // Modal states
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
@@ -48,8 +44,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    localStorage.setItem('agricare_fields', JSON.stringify(fields));
-  }, [fields]);
+    const saved = localStorage.getItem('agricare_fields');
+    if (saved) {
+      const allFields: Field[] = JSON.parse(saved);
+      const userFields = allFields.filter(f => f.user_id === user.id);
+      setFields(userFields);
+    }
+  }, [user.id]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -101,6 +102,14 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       size: parseFloat(newFieldData.size) || 0,
       soil_type: newFieldData.soilType
     };
+
+    // Update Global Storage
+    const saved = localStorage.getItem('agricare_fields');
+    const allFields: Field[] = saved ? JSON.parse(saved) : [];
+    const updatedGlobalFields = [...allFields, newField];
+    localStorage.setItem('agricare_fields', JSON.stringify(updatedGlobalFields));
+
+    // Update local state
     setFields([...fields, newField]);
     setShowAddFieldModal(false);
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
@@ -188,6 +197,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               </button>
             ))}
+            {fields.length === 0 && (
+              <div className="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                <p className="text-sm italic">You haven't added any fields yet.</p>
+              </div>
+            )}
           </div>
         </div>
 

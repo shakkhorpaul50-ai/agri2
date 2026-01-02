@@ -1,12 +1,24 @@
 
-import React from 'react';
-import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
+import React, { useState, useEffect } from 'react';
+import { User, Field } from '../../types';
+import { generateMockSensorData } from '../../constants';
 
-const Management: React.FC = () => {
-  const fieldData = MOCK_FIELDS.map(f => ({
-    field: f,
-    data: generateMockSensorData(f.field_id)[6] // Get latest mock data
-  }));
+const Management: React.FC<{ user: User }> = ({ user }) => {
+  const [fieldData, setFieldData] = useState<{field: Field, data: any}[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('agricare_fields');
+    if (saved) {
+      const allFields: Field[] = JSON.parse(saved);
+      const userFields = allFields.filter(f => f.user_id === user.id);
+      
+      const enrichedData = userFields.map(f => ({
+        field: f,
+        data: generateMockSensorData(f.field_id)[6] // Get latest mock data
+      }));
+      setFieldData(enrichedData);
+    }
+  }, [user.id]);
 
   const getWaterPrescription = (moisture: number, size: number) => {
     const targetMoisture = 65; 
@@ -98,7 +110,7 @@ const Management: React.FC = () => {
             <i className="fas fa-bell text-orange-500"></i> Active Management Alerts
           </h2>
           
-          {fieldData.map(({ field, data }) => {
+          {fieldData.length > 0 ? fieldData.map(({ field, data }) => {
             const waterNeed = getWaterPrescription(data.moisture, field.size);
             const fertNeeds = getFertilizerPrescription(data.npk_n, data.npk_p, data.npk_k);
             
@@ -150,7 +162,11 @@ const Management: React.FC = () => {
                 </div>
               </div>
             );
-          })}
+          }) : (
+            <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center text-slate-400">
+              <p>Add a field to see management prescriptions.</p>
+            </div>
+          )}
         </div>
 
         <div className="space-y-8">

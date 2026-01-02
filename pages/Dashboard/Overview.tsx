@@ -1,22 +1,24 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Field } from '../../types';
-import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
+import { generateMockSensorData } from '../../constants';
 
 const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateStep, setUpdateStep] = useState('');
-  const [fieldCount, setFieldCount] = useState(MOCK_FIELDS.length);
-  const [latestFields, setLatestFields] = useState<Field[]>(MOCK_FIELDS.slice(0, 2));
+  const [fieldCount, setFieldCount] = useState(0);
+  const [latestFields, setLatestFields] = useState<Field[]>([]);
   
   useEffect(() => {
     const savedFields = localStorage.getItem('agricare_fields');
     if (savedFields) {
-      const parsed = JSON.parse(savedFields);
-      setFieldCount(parsed.length);
-      setLatestFields(parsed.slice(0, 2));
+      const allFields: Field[] = JSON.parse(savedFields);
+      // Filter to only show this user's fields
+      const userFields = allFields.filter(f => f.user_id === user.id);
+      setFieldCount(userFields.length);
+      setLatestFields(userFields.slice(0, 2));
     }
-  }, []);
+  }, [user.id]);
 
   const alerts = [
     { type: 'warning', text: 'Low moisture detected in your primary plots.', time: '2h ago' },
