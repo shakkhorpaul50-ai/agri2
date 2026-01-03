@@ -14,52 +14,39 @@ const firebaseConfig = {
   appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
 };
 
-// Initialize Firebase with singleton check
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const auth: Auth = getAuth(app);
 const db: Firestore = getFirestore(app);
 
 export const isFirebaseEnabled = () => !!db;
 
-/**
- * Handles Firestore specific errors to provide better user feedback
- */
 const handleFirestoreError = (e: any) => {
   if (e.code === 'permission-denied') {
-    throw new Error("Database Access Denied: Please check your Firestore Security Rules in the Firebase Console. Ensure you have published rules that allow 'read' access for authenticated users.");
+    throw new Error("Database Access Denied: Please check your Firestore Security Rules. Authenticated users must have read/write access to their own documents.");
   }
   throw e;
 };
 
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
   try {
-    // 1. Authenticate with Firebase Auth
     const cred = await signInWithEmailAndPassword(auth, email, pass);
+    const userDocRef = doc(db, 'users', cred.user.uid);
+    const userDoc = await getDoc(userDocRef);
     
-    // 2. Fetch User Profile from Firestore
-    try {
-      const userDocRef = doc(db, 'users', cred.user.uid);
-      const userDoc = await getDoc(userDocRef);
-      
-      if (userDoc.exists()) {
-        return userDoc.data() as User;
-      } else {
-        // Create profile if it doesn't exist but user is authenticated
-        const fallbackUser: User = {
-          id: cred.user.uid,
-          name: email.split('@')[0],
-          email: email,
-          subscriptionPlan: 'basic',
-          subscriptionEnd: new Date(Date.now() + 31536000000).toISOString()
-        };
-        await setDoc(userDocRef, fallbackUser);
-        return fallbackUser;
-      }
-    } catch (dbError: any) {
-      return handleFirestoreError(dbError);
+    if (userDoc.exists()) {
+      return userDoc.data() as User;
+    } else {
+      const fallbackUser: User = {
+        id: cred.user.uid,
+        name: email.split('@')[0],
+        email: email,
+        subscriptionPlan: 'basic',
+        subscriptionEnd: new Date(Date.now() + 31536000000).toISOString()
+      };
+      await setDoc(userDocRef, fallbackUser);
+      return fallbackUser;
     }
   } catch (authError: any) {
-    console.error("Auth Error:", authError);
     throw authError;
   }
 };
@@ -82,7 +69,6 @@ export const syncFields = async (userId: string): Promise<Field[]> => {
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as Field);
   } catch (e) {
-    console.error("Sync Fields Error:", e);
     return [];
   }
 };
@@ -124,4 +110,37 @@ export const deleteSensorFromDb = async (id: number): Promise<void> => {
   } catch (e) {
     console.error(e);
   }
-}
+};
+
+/**
+ * Manual Diagnostics Persistence
+ */
+export const saveManualDiagnostic = async (fieldId: number, data: any): Promise<void> => {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'manual_diagnostics', fieldId.toString()), {
+      field_id: fieldId,
+      ...data,
+      updated_at: new Date().toISOString()
+    });
+  } catch (e) {
+    console.error("Failed to save manual diagnostic:", e);
+  }
+};
+
+export const getManualDiagnosticsForFields = async (fieldIds: number[]): Promise<Record<number, any>> => {
+  if (!db || fieldIds.length === 0) return {};
+  try {
+    const q = query(collection(db, 'manual_diagnostics'), where('field_id', 'in', fieldIds));
+    const snap = await getDocs(q);
+    const results: Record<number, any> = {};
+    snap.forEach(doc => {
+      const data = doc.data();
+      results[data.field_id] = data;
+    });
+    return results;
+  } catch (e) {
+    console.error("Failed to fetch manual diagnostics:", e);
+    return {};
+  }
+};

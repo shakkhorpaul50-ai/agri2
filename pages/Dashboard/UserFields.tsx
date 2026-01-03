@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Field, SensorData, CropRecommendation, Sensor } from '../../types';
 import { generateMockSensorData } from '../../constants';
 import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, checkAIConnection } from '../../services/gemini';
-import { syncFields, syncSensorsFromDb } from '../../services/db';
+import { syncFields, syncSensorsFromDb, addFieldToDb, getManualDiagnosticsForFields } from '../../services/db';
 
 interface ManagementTask {
   priority: string;
@@ -38,19 +38,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     loadData();
   }, [user.id]);
 
-  /**
-   * Aggregates the most accurate data for a field by merging:
-   * 1. Manual Diagnostic Overrides (Local Storage)
-   * 2. Live Sensor Data (Firestore)
-   * 3. Mock Data (Fallback)
-   */
   const getFieldCurrentStats = async (field: Field): Promise<SensorData> => {
     // 1. Get Live Sensors from DB
     const fieldSensors = await syncSensorsFromDb([field]);
     
-    // 2. Get Manual Diagnostics
-    const savedManual = localStorage.getItem('agricare_manual_diagnostics');
-    const manualDiags = savedManual ? JSON.parse(savedManual) : {};
+    // 2. Get Manual Diagnostics from DB
+    const manualDiags = await getManualDiagnosticsForFields([field.field_id]);
     const fieldManual = manualDiags[field.field_id];
 
     // 3. Start with Mock Base
@@ -111,9 +104,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const handleAddField = (e: React.FormEvent) => {
+  const handleAddField = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real scenario, this would call addFieldToDb
     const newField: Field = {
       field_id: Math.floor(Math.random() * 100000),
       user_id: user.id,
@@ -122,6 +114,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       size: parseFloat(newFieldData.size) || 0,
       soil_type: newFieldData.soilType
     };
+    
+    await addFieldToDb(newField);
     setFields([...fields, newField]);
     setShowAddFieldModal(false);
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
@@ -148,7 +142,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm">Real-time IoT and Manual Diagnostics Hub</p>
+          <p className="text-slate-500 text-sm">Real-time Cloud Analysis & Recommendations</p>
         </div>
         <div className="flex gap-4">
           {selectedField && (
@@ -189,7 +183,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Field Diagnostics Ready</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to initialize Gemini-driven analysis based on your sensor or manual data.</p>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to initialize Gemini-driven analysis based on your cloud-synced data.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -212,7 +206,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                  <h3 className="text-2xl font-bold text-slate-800">Processing Diagnostic Stream...</h3>
+                  <h3 className="text-2xl font-bold text-slate-800">Syncing with Cloud Diagnostics...</h3>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
