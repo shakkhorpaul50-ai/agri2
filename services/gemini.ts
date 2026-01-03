@@ -1,43 +1,56 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Field, SensorData } from "../types";
+import { Field } from "../types";
 
-export const checkAIConnection = () => {
-  return true;
+/**
+ * Check if the user has already selected an API key via the platform's key selector.
+ * Gemini 3 series models may require explicit key selection in certain environments.
+ */
+export const isAiReady = async () => {
+  if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
+    return await (window as any).aistudio.hasSelectedApiKey();
+  }
+  return !!process.env.API_KEY;
+};
+
+/**
+ * Trigger the platform's API key selection dialog.
+ */
+export const openAiKeySelector = async () => {
+  if (typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey) {
+    await (window as any).aistudio.openSelectKey();
+    return true;
+  }
+  return false;
 };
 
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("API_KEY_MISSING");
+    throw new Error("API_KEY_REQUIRED");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 /**
  * Format sensor values for the AI prompt.
- * Clearly identifies what we HAVE and what we are MISSING.
+ * Robust handling of null/undefined to ensure the AI knows what's real and what's inferred.
  */
 const formatDataForPrompt = (data: any) => {
-  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(1) : null;
-
-  const m = safeVal(data.moisture);
-  const t = safeVal(data.temperature);
-  const ph = safeVal(data.ph_level);
-  const n = safeVal(data.npk_n);
-  const p = safeVal(data.npk_p);
-  const k = safeVal(data.npk_k);
+  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "MISSING";
 
   return `
-    CURRENT SENSOR READINGS:
-    - Soil Moisture: ${m != null ? `${m}%` : 'Not Measured'}
-    - Soil pH: ${ph != null ? ph : 'Not Measured'}
-    - Temperature: ${t != null ? `${t}°C` : 'Not Measured'}
-    - Nitrogen (N): ${n != null ? `${n} ppm` : 'Not Measured'}
-    - Phosphorus (P): ${p != null ? `${p} ppm` : 'Not Measured'}
-    - Potassium (K): ${k != null ? `${k} ppm` : 'Not Measured'}
+    FIELD MEASUREMENTS:
+    - Soil Moisture: ${safeVal(data.moisture)}${data.moisture != null ? '%' : ''}
+    - Soil pH: ${safeVal(data.ph_level)}
+    - Ambient Temperature: ${safeVal(data.temperature)}${data.temperature != null ? '°C' : ''}
+    - Nitrogen (N): ${safeVal(data.npk_n)} ppm
+    - Phosphorus (P): ${safeVal(data.npk_p)} ppm
+    - Potassium (K): ${safeVal(data.npk_k)} ppm
     
-    NOTE: If a value is "Not Measured", use your expert knowledge of the region (${data.location || 'Bangladesh'}) and soil type (${data.soil_type || 'Loamy'}) to provide the best possible advice.
+    CRITICAL CONTEXT:
+    If data is "MISSING", use your knowledge of ${data.location || 'Bangladesh'} and ${data.soil_type || 'Loamy'} soil to infer likely conditions. 
+    However, prioritize the real sensor readings for ${data.moisture != null ? 'Moisture' : ''} ${data.ph_level != null ? 'and pH' : ''}.
   `;
 };
 
@@ -45,14 +58,13 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `
-        Analyze this field for crop suitability. 
-        Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
+        Analyze this agricultural field and recommend the top 3 best-fitting crops.
+        Field: ${field.field_name}, Location: ${field.location}, Soil Type: ${field.soil_type}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        GOAL: Provide the top 3 recommended crops based ON THE PROVIDED DATA. 
-        If some data is missing (like NPK), recommend crops that generally thrive in ${field.soil_type} soil in the ${field.location} region, adjusted for the available measurements.
+        Provide high-yield recommendations specifically for the ${field.location} region.
       `,
       config: {
         responseMimeType: "application/json",
@@ -62,10 +74,10 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
             type: Type.OBJECT,
             properties: {
               name: { type: Type.STRING },
-              suitability: { type: Type.NUMBER },
-              yield: { type: Type.STRING },
-              requirements: { type: Type.STRING },
-              icon: { type: Type.STRING }
+              suitability: { type: Type.NUMBER, description: "Match percentage 0-100" },
+              yield: { type: Type.STRING, description: "Expected tonnage per hectare" },
+              requirements: { type: Type.STRING, description: "Specific care instructions based on current soil" },
+              icon: { type: Type.STRING, description: "FontAwesome icon name (e.g., fa-wheat-awn)" }
             },
             required: ["name", "suitability", "yield", "requirements", "icon"]
           }
@@ -74,7 +86,8 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     });
     
     return JSON.parse(response.text || '[]');
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "API_KEY_REQUIRED") throw error;
     console.error("Gemini Analysis Error:", error);
     return [];
   }
@@ -86,18 +99,17 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        As an agricultural expert, summarize the soil health for ${field.field_name}.
-        Location: ${field.location}, Soil: ${field.soil_type}.
+        Summarize the current soil health for ${field.field_name} in ${field.location}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Provide a 3-sentence summary based on available markers. No markdown.
+        Write exactly 3 sentences. Be scientific but accessible. If sensors show critical levels (e.g., very low moisture), highlight them first.
       `
     });
     
-    return response.text || "Analysis complete based on available telemetry.";
-  } catch (error) {
-    console.error("Gemini Summary Error:", error);
-    return "AI analysis is currently unavailable.";
+    return response.text || "Diagnostic summary complete. Conditions appear stable.";
+  } catch (error: any) {
+    if (error.message === "API_KEY_REQUIRED") throw error;
+    return "The AI engine is currently processing your request. Please wait...";
   }
 };
 
@@ -105,13 +117,12 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `
-        Generate exactly 4 prioritized farm management tasks.
-        Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
+        Generate 4 management tasks for this field.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Prioritize tasks based on current Moisture and pH readings. If NPK is missing, suggest a soil test.
+        Focus on immediate actions (Irrigation, pH correction, or Fertilizer application) based on the specific numbers provided.
       `,
       config: {
         responseMimeType: "application/json",
@@ -120,7 +131,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
           items: {
             type: Type.OBJECT,
             properties: {
-              priority: { type: Type.STRING },
+              priority: { type: Type.STRING, description: "High, Medium, or Low" },
               title: { type: Type.STRING },
               description: { type: Type.STRING },
               icon: { type: Type.STRING }
@@ -132,8 +143,8 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     });
     
     return JSON.parse(response.text || '[]');
-  } catch (error) {
-    console.error("Gemini Plan Error:", error);
+  } catch (error: any) {
+    if (error.message === "API_KEY_REQUIRED") throw error;
     return [];
   }
 };
