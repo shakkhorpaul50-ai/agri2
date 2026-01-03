@@ -68,24 +68,24 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     // 1. Apply Sensor Data
     fieldSensors.forEach(s => {
       if (!s.last_reading) return;
-      if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value;
-      if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value;
-      if (s.sensor_type === 'PH Probe') stats.ph_level = s.last_reading.value;
+      if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value ?? null;
+      if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value ?? null;
+      if (s.sensor_type === 'PH Probe') stats.ph_level = s.last_reading.value ?? null;
       if (s.sensor_type === 'NPK Analyzer') {
-        stats.npk_n = s.last_reading.n;
-        stats.npk_p = s.last_reading.p;
-        stats.npk_k = s.last_reading.k;
+        stats.npk_n = s.last_reading.n ?? null;
+        stats.npk_p = s.last_reading.p ?? null;
+        stats.npk_k = s.last_reading.k ?? null;
       }
     });
 
     // 2. Apply Manual Overrides (Highest Priority - This is the "Manual Data" requested)
     if (fieldManual) {
-      if (fieldManual.moisture !== undefined) stats.moisture = fieldManual.moisture;
-      if (fieldManual.temp !== undefined) stats.temperature = fieldManual.temp;
-      if (fieldManual.ph !== undefined) stats.ph_level = fieldManual.ph;
-      if (fieldManual.n !== undefined) stats.npk_n = fieldManual.n;
-      if (fieldManual.p !== undefined) stats.npk_p = fieldManual.p;
-      if (fieldManual.k !== undefined) stats.npk_k = fieldManual.k;
+      if (fieldManual.moisture !== undefined && fieldManual.moisture !== null) stats.moisture = fieldManual.moisture;
+      if (fieldManual.temp !== undefined && fieldManual.temp !== null) stats.temperature = fieldManual.temp;
+      if (fieldManual.ph !== undefined && fieldManual.ph !== null) stats.ph_level = fieldManual.ph;
+      if (fieldManual.n !== undefined && fieldManual.n !== null) stats.npk_n = fieldManual.n;
+      if (fieldManual.p !== undefined && fieldManual.p !== null) stats.npk_p = fieldManual.p;
+      if (fieldManual.k !== undefined && fieldManual.k !== null) stats.npk_k = fieldManual.k;
     }
 
     return stats;
@@ -98,11 +98,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setAiSummary(null);
     setManagementPlan(null);
     
-    const latest = await getFieldCurrentStats(field);
-    setCurrentDataState(latest);
-    
     try {
-      // Re-check AI connection before proceeding
+      const latest = await getFieldCurrentStats(field);
+      setCurrentDataState(latest);
+      
       const isConnected = checkAIConnection();
       setAiConnected(isConnected);
 
@@ -121,7 +120,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       }
     } catch (err) {
       console.error("Field analysis failed", err);
-      setAiSummary("An error occurred during AI analysis. Please try again.");
+      setAiSummary("An error occurred during AI analysis. Please check your data or try again later.");
     } finally {
       setLoading(false);
     }
@@ -203,17 +202,17 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   
                   {/* Current Real Data Inventory - Shows what is being used */}
                   <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl flex flex-wrap gap-6 text-[11px] font-bold uppercase tracking-wider border border-white/5">
-                    <div className={`flex items-center gap-2 ${currentDataState?.moisture !== null ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
-                      <i className={`fas ${currentDataState?.moisture !== null ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
-                      <span>Moisture {currentDataState?.moisture !== null ? `(${currentDataState.moisture}%)` : 'Missing'}</span>
+                    <div className={`flex items-center gap-2 ${currentDataState?.moisture !== null && currentDataState?.moisture !== undefined ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
+                      <i className={`fas ${currentDataState?.moisture !== null && currentDataState?.moisture !== undefined ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
+                      <span>Moisture {currentDataState?.moisture !== null && currentDataState?.moisture !== undefined ? `(${currentDataState.moisture}%)` : 'Missing'}</span>
                     </div>
-                    <div className={`flex items-center gap-2 ${currentDataState?.ph_level !== null ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
-                      <i className={`fas ${currentDataState?.ph_level !== null ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
-                      <span>pH {currentDataState?.ph_level !== null ? `(${currentDataState.ph_level})` : 'Missing'}</span>
+                    <div className={`flex items-center gap-2 ${currentDataState?.ph_level !== null && currentDataState?.ph_level !== undefined ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
+                      <i className={`fas ${currentDataState?.ph_level !== null && currentDataState?.ph_level !== undefined ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
+                      <span>pH {currentDataState?.ph_level !== null && currentDataState?.ph_level !== undefined ? `(${currentDataState.ph_level})` : 'Missing'}</span>
                     </div>
-                    <div className={`flex items-center gap-2 ${currentDataState?.npk_n !== null ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
-                      <i className={`fas ${currentDataState?.npk_n !== null ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
-                      <span>NPK {currentDataState?.npk_n !== null ? 'Active' : 'Missing'}</span>
+                    <div className={`flex items-center gap-2 ${currentDataState?.npk_n !== null && currentDataState?.npk_n !== undefined ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
+                      <i className={`fas ${currentDataState?.npk_n !== null && currentDataState?.npk_n !== undefined ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
+                      <span>NPK {currentDataState?.npk_n !== null && currentDataState?.npk_n !== undefined ? 'Active' : 'Missing'}</span>
                     </div>
                   </div>
                 </div>
@@ -222,8 +221,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                  <h3 className="text-2xl font-bold text-slate-800">Processing Real Data Stream...</h3>
-                  <p className="text-slate-500 mt-2">Connecting to Gemini-3 to analyze your specific field conditions.</p>
+                  <h3 className="text-2xl font-bold text-slate-800">Syncing Diagnostic Data...</h3>
+                  <p className="text-slate-500 mt-2">Connecting to AI engine to analyze your current soil markers.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
@@ -233,7 +232,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-dna"></i>
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-sparkles text-emerald-600"></i> AI Soil Health Insight</h3>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">{aiSummary || "Select a field to begin analysis."}</p>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
+                        {aiSummary || "Select a field and provide measurements to begin analysis."}
+                      </p>
                     </div>
 
                     <div>
@@ -256,7 +257,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                       ) : (
                         <div className="bg-slate-50 p-12 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-slate-400">
-                          {aiConnected ? "No specific crop matches found based on current data." : "AI analysis is required for suitability index."}
+                          <i className="fas fa-chart-area text-3xl mb-4 block opacity-30"></i>
+                          <p className="text-sm">{aiConnected ? "Add sensor data or manual measurements to see crop matches." : "AI analysis is required for suitability index."}</p>
                         </div>
                       )}
                     </div>
@@ -280,7 +282,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="text-center py-12 text-slate-300">
                             <i className="fas fa-clipboard-list text-4xl mb-4 block opacity-20"></i>
-                            <p className="text-sm">Complete soil measurements to generate your roadmap.</p>
+                            <p className="text-sm">Measurements required to generate your localized roadmap.</p>
                           </div>
                         )}
                       </div>

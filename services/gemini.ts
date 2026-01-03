@@ -21,13 +21,23 @@ const getAIClient = () => {
 
 /**
  * Format sensor values for the AI prompt, clearly marking missing data.
+ * Added safety checks to prevent .toFixed() crashes on null values.
  */
 const formatDataForPrompt = (data: any) => {
+  const safeFormat = (val: any, suffix: string = '') => {
+    if (val === null || val === undefined) return 'STRICTLY NOT PROVIDED (DO NOT GUESS)';
+    return `${Number(val).toFixed(1)}${suffix}`;
+  };
+
+  const n = data.npk_n !== null && data.npk_n !== undefined ? data.npk_n : 'MISSING';
+  const p = data.npk_p !== null && data.npk_p !== undefined ? data.npk_p : 'MISSING';
+  const k = data.npk_k !== null && data.npk_k !== undefined ? data.npk_k : 'MISSING';
+
   return `
-    - Temperature: ${data.temperature !== null ? `${data.temperature.toFixed(1)}°C` : 'STRICTLY NOT PROVIDED (DO NOT GUESS)'}
-    - Moisture: ${data.moisture !== null ? `${data.moisture.toFixed(1)}%` : 'STRICTLY NOT PROVIDED (DO NOT GUESS)'}
-    - pH Level: ${data.ph_level !== null ? `${data.ph_level.toFixed(1)}` : 'STRICTLY NOT PROVIDED (DO NOT GUESS)'}
-    - NPK Profile: ${data.npk_n !== null ? `N=${data.npk_n}, P=${data.npk_p}, K=${data.npk_k}` : 'STRICTLY NOT PROVIDED (DO NOT SUGGEST FERTILIZERS)'}
+    - Temperature: ${safeFormat(data.temperature, '°C')}
+    - Moisture: ${safeFormat(data.moisture, '%')}
+    - pH Level: ${safeFormat(data.ph_level)}
+    - NPK Profile: ${n === 'MISSING' ? 'STRICTLY NOT PROVIDED' : `N=${n}, P=${p}, K=${k}`}
   `;
 };
 
