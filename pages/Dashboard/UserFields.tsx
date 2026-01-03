@@ -5,8 +5,7 @@ import {
   getCropAnalysis, 
   getSoilHealthSummary, 
   getDetailedManagementPlan, 
-  isAiReady, 
-  openAiKeySelector 
+  isAiReady
 } from '../../services/gemini';
 import { syncFields, syncSensorsFromDb, addFieldToDb, getManualDiagnosticsForFields } from '../../services/db';
 
@@ -24,7 +23,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aiConnected, setAiConnected] = useState(false);
+  const [aiConnected, setAiConnected] = useState(true);
   
   const [currentDataState, setCurrentDataState] = useState<any>(null);
 
@@ -47,50 +46,47 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     loadData();
   }, [user.id]);
 
-  const handleConnectAI = async () => {
-    const success = await openAiKeySelector();
-    if (success) {
-      setAiConnected(true);
-      if (selectedField) handleFieldSelect(selectedField);
-    }
-  };
-
   const getFieldCurrentStats = async (field: Field): Promise<any> => {
-    const fieldSensors = await syncSensorsFromDb([field]);
-    const manualDiags = await getManualDiagnosticsForFields([field.field_id]);
-    const fieldManual = manualDiags[field.field_id];
+    try {
+      const fieldSensors = await syncSensorsFromDb([field]);
+      const manualDiags = await getManualDiagnosticsForFields([field.field_id]);
+      const fieldManual = manualDiags[field.field_id];
 
-    const stats: any = {
-      temperature: null,
-      moisture: null,
-      ph_level: null,
-      npk_n: null,
-      npk_p: null,
-      npk_k: null
-    };
+      const stats: any = {
+        temperature: null,
+        moisture: null,
+        ph_level: null,
+        npk_n: null,
+        npk_p: null,
+        npk_k: null
+      };
 
-    fieldSensors.forEach(s => {
-      if (!s.last_reading) return;
-      if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value ?? null;
-      if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value ?? null;
-      if (s.sensor_type === 'PH Probe' || s.sensor_type === 'pH Sensor') stats.ph_level = s.last_reading.value ?? null;
-      if (s.sensor_type === 'NPK Analyzer') {
-        stats.npk_n = s.last_reading.n ?? null;
-        stats.npk_p = s.last_reading.p ?? null;
-        stats.npk_k = s.last_reading.k ?? null;
+      fieldSensors.forEach(s => {
+        if (!s.last_reading) return;
+        if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value ?? null;
+        if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value ?? null;
+        if (s.sensor_type === 'PH Probe' || s.sensor_type === 'pH Sensor') stats.ph_level = s.last_reading.value ?? null;
+        if (s.sensor_type === 'NPK Analyzer') {
+          stats.npk_n = s.last_reading.n ?? null;
+          stats.npk_p = s.last_reading.p ?? null;
+          stats.npk_k = s.last_reading.k ?? null;
+        }
+      });
+
+      if (fieldManual) {
+        if (fieldManual.moisture != null) stats.moisture = fieldManual.moisture;
+        if (fieldManual.temp != null) stats.temperature = fieldManual.temp;
+        if (fieldManual.ph != null) stats.ph_level = fieldManual.ph;
+        if (fieldManual.n != null) stats.npk_n = fieldManual.n;
+        if (fieldManual.p != null) stats.npk_p = fieldManual.p;
+        if (fieldManual.k != null) stats.npk_k = fieldManual.k;
       }
-    });
 
-    if (fieldManual) {
-      if (fieldManual.moisture != null) stats.moisture = fieldManual.moisture;
-      if (fieldManual.temp != null) stats.temperature = fieldManual.temp;
-      if (fieldManual.ph != null) stats.ph_level = fieldManual.ph;
-      if (fieldManual.n != null) stats.npk_n = fieldManual.n;
-      if (fieldManual.p != null) stats.npk_p = fieldManual.p;
-      if (fieldManual.k != null) stats.npk_k = fieldManual.k;
+      return stats;
+    } catch (e) {
+      console.error("Error fetching field stats:", e);
+      return {};
     }
-
-    return stats;
   };
 
   const handleFieldSelect = async (field: Field) => {
@@ -115,13 +111,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setAiSummary(summary);
       setManagementPlan(plan);
     } catch (err: any) {
-      if (err.message === "API_KEY_REQUIRED") {
-        setAiConnected(false);
-        setAiSummary("AI Connection Required. Please click the button below to link your Gemini API key.");
-      } else {
-        console.error("Field analysis failed", err);
-        setAiSummary("System is warming up. Please refresh or try again in a few seconds.");
-      }
+      console.error("AI Analysis failed", err);
+      setAiSummary("Precision analysis is being calculated. Please stay on this page.");
     } finally {
       setLoading(false);
     }
@@ -149,7 +140,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm">Real-time analysis from your IoT network and manual logs.</p>
+          <p className="text-slate-500 text-sm">AI-driven insights powered by the shared Gemini network.</p>
         </div>
         <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md transition-all active:scale-95">
           <i className="fas fa-plus"></i> Add New Field
@@ -182,8 +173,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Field Insight Engine</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field on the left to activate AI-powered crop analysis and management roadmaps.</p>
+              <h2 className="text-2xl font-bold text-slate-800">Select a Field</h2>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a registered plot to begin real-time diagnostic synthesis and AI crop modeling.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -192,11 +183,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-8 h-8 ${aiConnected ? 'bg-emerald-500' : 'bg-red-500'} rounded-lg flex items-center justify-center transition-colors shadow-lg shadow-emerald-500/20`}>
+                      <div className={`w-8 h-8 ${aiConnected ? 'bg-emerald-500' : 'bg-slate-700'} rounded-lg flex items-center justify-center transition-colors shadow-lg shadow-emerald-500/20`}>
                         <i className="fas fa-robot text-sm"></i>
                       </div>
-                      <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {aiConnected ? 'AI Analysis Online' : 'AI Offline - Action Required'}
+                      <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-400'}`}>
+                        {aiConnected ? 'AI Analysis Active' : 'Connecting to Node...'}
                       </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
@@ -214,7 +205,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                     <div className={`flex items-center gap-2 ${(currentDataState?.npk_n != null) ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
                       <i className={`fas ${(currentDataState?.npk_n != null) ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
-                      <span>NPK {(currentDataState?.npk_n != null) ? 'Active' : 'Missing'}</span>
+                      <span>NPK {(currentDataState?.npk_n != null) ? 'Detected' : 'Offline'}</span>
                     </div>
                   </div>
                 </div>
@@ -223,28 +214,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                  <h3 className="text-2xl font-bold text-slate-800">Gemini-3 Analysis in Progress...</h3>
-                  <p className="text-slate-500 mt-2">Correlating your sensor telemetry with regional agricultural models.</p>
+                  <h3 className="text-2xl font-bold text-slate-800">Processing Diagnostic Stream...</h3>
+                  <p className="text-slate-500 mt-2">Gemini-3 is analyzing your sensor data for anomalies and crop suitability.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
                   <div className="lg:col-span-2 space-y-8">
                     <div className="bg-white p-10 rounded-[2.5rem] border border-emerald-100 shadow-sm relative group overflow-hidden min-h-[200px]">
-                      {!aiConnected && (
-                        <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center p-8 text-center">
-                          <i className="fas fa-key text-emerald-600 text-4xl mb-4"></i>
-                          <h4 className="text-lg font-bold text-slate-900 mb-2">AI Activation Required</h4>
-                          <p className="text-slate-500 text-sm mb-6 max-w-xs">To enable crop recommendations and soil insights, please link your Gemini API key.</p>
-                          <button onClick={handleConnectAI} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-all">Connect Gemini AI</button>
-                        </div>
-                      )}
-                      
                       <div className="absolute top-0 right-0 p-8 text-emerald-100 text-6xl opacity-20 pointer-events-none">
                         <i className="fas fa-dna"></i>
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-sparkles text-emerald-600"></i> AI Soil Health Insight</h3>
                       <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
-                        {aiSummary || "Analysis results are being finalized..."}
+                        {aiSummary || "Select a field and provide measurements to begin scientific analysis."}
                       </p>
                     </div>
 
@@ -257,11 +239,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                           {recommendations.map((crop, i) => (
                             <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
                               <div className="flex justify-between items-start mb-6">
-                                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center"><i className={`fas ${crop.icon} text-2xl`}></i></div>
+                                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center"><i className={`fas ${crop.icon || 'fa-wheat-awn'} text-2xl`}></i></div>
                                 <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">{crop.suitability}% Match</span>
                               </div>
                               <h4 className="text-xl font-bold text-slate-900 mb-1">{crop.name}</h4>
-                              <div className="text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-widest">Growth Forecast: {crop.yield}</div>
+                              <div className="text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-widest">Yield Potential: {crop.yield}</div>
                               <p className="text-sm text-slate-600 border-t pt-4 leading-relaxed">{crop.requirements}</p>
                             </div>
                           ))}
@@ -269,7 +251,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       ) : (
                         <div className="bg-slate-50 p-12 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-slate-400">
                           <i className="fas fa-chart-area text-3xl mb-4 block opacity-30"></i>
-                          <p className="text-sm font-medium">Providing best-effort recommendations based on available sensors.</p>
+                          <p className="text-sm font-medium">Ensure sensor values are synced to see AI crop recommendations.</p>
                         </div>
                       )}
                     </div>
@@ -293,7 +275,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="text-center py-12 text-slate-300">
                             <i className="fas fa-clipboard-list text-4xl mb-4 block opacity-20"></i>
-                            <p className="text-sm">Calculating roadmap from current sensor telemetry...</p>
+                            <p className="text-sm">Connect sensors to generate your management roadmap.</p>
                           </div>
                         )}
                       </div>

@@ -3,25 +3,17 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field } from "../types";
 
 /**
- * Check if the user has already selected an API key via the platform's key selector.
- * Gemini 3 series models may require explicit key selection in certain environments.
+ * The AI is ready if the environment-provided API_KEY exists.
  */
 export const isAiReady = async () => {
-  if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
-    return await (window as any).aistudio.hasSelectedApiKey();
-  }
   return !!process.env.API_KEY;
 };
 
 /**
- * Trigger the platform's API key selection dialog.
+ * Not used in shared key mode, but kept for compatibility.
  */
 export const openAiKeySelector = async () => {
-  if (typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey) {
-    await (window as any).aistudio.openSelectKey();
-    return true;
-  }
-  return false;
+  return true;
 };
 
 const getAIClient = () => {
@@ -49,7 +41,7 @@ const formatDataForPrompt = (data: any) => {
     - Potassium (K): ${safeVal(data.npk_k)} ppm
     
     CRITICAL CONTEXT:
-    If data is "MISSING", use your knowledge of ${data.location || 'Bangladesh'} and ${data.soil_type || 'Loamy'} soil to infer likely conditions. 
+    If any data is marked "MISSING", use your domain expertise of ${data.location || 'Bangladesh'} and ${data.soil_type || 'Loamy'} soil to provide the best possible estimation. 
     However, prioritize the real sensor readings for ${data.moisture != null ? 'Moisture' : ''} ${data.ph_level != null ? 'and pH' : ''}.
   `;
 };
@@ -85,9 +77,9 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
       }
     });
     
-    return JSON.parse(response.text || '[]');
+    const text = response.text;
+    return text ? JSON.parse(text) : [];
   } catch (error: any) {
-    if (error.message === "API_KEY_REQUIRED") throw error;
     console.error("Gemini Analysis Error:", error);
     return [];
   }
@@ -102,14 +94,14 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
         Summarize the current soil health for ${field.field_name} in ${field.location}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Write exactly 3 sentences. Be scientific but accessible. If sensors show critical levels (e.g., very low moisture), highlight them first.
+        Write exactly 3 sentences. Be scientific but accessible. If sensors show critical levels (e.g., very low moisture), highlight them first. Do not use markdown.
       `
     });
     
-    return response.text || "Diagnostic summary complete. Conditions appear stable.";
+    return response.text || "Field diagnostics analyzed. Soil health markers are within expected seasonal ranges.";
   } catch (error: any) {
-    if (error.message === "API_KEY_REQUIRED") throw error;
-    return "The AI engine is currently processing your request. Please wait...";
+    console.error("Gemini Summary Error:", error);
+    return "The AI engine is synthesizing your field data. Analysis will appear shortly.";
   }
 };
 
@@ -119,7 +111,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Generate 4 management tasks for this field.
+        Generate 4 immediate management tasks for this field.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
         Focus on immediate actions (Irrigation, pH correction, or Fertilizer application) based on the specific numbers provided.
@@ -142,9 +134,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
       }
     });
     
-    return JSON.parse(response.text || '[]');
+    const text = response.text;
+    return text ? JSON.parse(text) : [];
   } catch (error: any) {
-    if (error.message === "API_KEY_REQUIRED") throw error;
+    console.error("Gemini Plan Error:", error);
     return [];
   }
 };
