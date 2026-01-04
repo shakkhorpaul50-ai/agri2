@@ -36,20 +36,21 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   });
 
   useEffect(() => {
-    const loadData = async () => {
-      const dbFields = await syncFields(user.id);
-      setFields(dbFields);
-      
+    const checkAi = async () => {
       const ready = await isAiReady();
       setAiConnected(ready);
     };
-    loadData();
+    const loadFields = async () => {
+      const dbFields = await syncFields(user.id);
+      setFields(dbFields);
+    };
+    checkAi();
+    loadFields();
   }, [user.id]);
 
   const getFieldCurrentStats = async (field: Field): Promise<any> => {
     try {
       const fieldSensors = await syncSensorsFromDb([field]);
-      
       const stats: any = {
         temperature: null,
         moisture: null,
@@ -71,7 +72,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           stats.npk_k = s.last_reading.k ?? null;
         }
       });
-
       return stats;
     } catch (e) {
       console.error("Error fetching field stats:", e);
@@ -91,7 +91,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       const latest = await getFieldCurrentStats(field);
       setCurrentDataState(latest);
 
-      // In Central API mode, we use process.env.API_KEY automatically
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, latest),
         getSoilHealthSummary(field, latest),
@@ -103,7 +102,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setManagementPlan(plan);
     } catch (err: any) {
       console.error("AI Analysis failed", err);
-      setAiSummary("Central API Engine is processing data. If results do not appear, verify the shared API_KEY configuration.");
+      setAiSummary("AI Node busy. Ensure your central API_KEY is configured in the hosting provider.");
     } finally {
       setLoading(false);
     }
@@ -131,7 +130,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm">Automatic AI health diagnostics powered by central API telemetry.</p>
+          <p className="text-slate-500 text-sm">Automated health diagnostics based on your manual sensor uploads.</p>
         </div>
         <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md transition-all active:scale-95">
           <i className="fas fa-plus"></i> Add New Field
@@ -165,7 +164,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Select a Plot</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Choose a field on the left. The AI will automatically analyze your manual sensor uploads.</p>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Choose a field on the left to see health conditions and improvement steps.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -178,7 +177,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-robot text-sm"></i>
                       </div>
                       <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-400'}`}>
-                        {aiConnected ? 'AI Health Engine Active' : 'Checking AI Node...'}
+                        {aiConnected ? 'AI Health Engine Active' : 'AI Offline'}
                       </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
@@ -205,8 +204,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                  <h3 className="text-2xl font-bold text-slate-800">Synthesizing Condition Report...</h3>
-                  <p className="text-slate-500 mt-2">Correlating your manual sensor data with central agricultural intelligence.</p>
+                  <h3 className="text-2xl font-bold text-slate-800">Processing Field Health...</h3>
+                  <p className="text-slate-500 mt-2">Connecting to the central Gemini-3 engine.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
@@ -217,13 +216,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-stethoscope text-emerald-600"></i> AI Soil Health Insight</h3>
                       <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
-                        {aiSummary || "Select a field and ensure your sensors page has manual data entries to see the health report."}
+                        {aiSummary || "Update your sensor data in the Sensors tab to generate a condition report."}
                       </p>
                     </div>
 
                     <div>
                       <h3 className="text-xl font-bold text-slate-900 mb-6 px-2 flex items-center gap-3">
-                        <i className="fas fa-seedling text-emerald-600"></i> Optimized Crop Recommendations
+                        <i className="fas fa-seedling text-emerald-600"></i> Crop Recommendations
                       </h3>
                       {recommendations && recommendations.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -234,7 +233,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                                 <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">{crop.suitability}% Match</span>
                               </div>
                               <h4 className="text-xl font-bold text-slate-900 mb-1">{crop.name}</h4>
-                              <div className="text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-widest">Yield Projection: {crop.yield}</div>
                               <p className="text-sm text-slate-600 border-t pt-4 leading-relaxed">{crop.requirements}</p>
                             </div>
                           ))}
@@ -242,7 +240,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       ) : (
                         <div className="bg-slate-50 p-12 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-slate-400">
                           <i className="fas fa-chart-area text-3xl mb-4 block opacity-30"></i>
-                          <p className="text-sm font-medium">Update your sensor values on the Sensors tab to unlock automatic crop modeling.</p>
+                          <p className="text-sm font-medium">Update sensor values to see AI modeling.</p>
                         </div>
                       )}
                     </div>
@@ -266,7 +264,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="text-center py-12 text-slate-300">
                             <i className="fas fa-clipboard-list text-4xl mb-4 block opacity-20"></i>
-                            <p className="text-sm">Improvement steps to make crops healthier will appear here once sensor data is analyzed.</p>
+                            <p className="text-sm">Improvement steps will appear here after data sync.</p>
                           </div>
                         )}
                       </div>
