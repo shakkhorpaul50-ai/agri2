@@ -5,7 +5,6 @@ import { Field, CropRecommendation } from "../types";
 /**
  * Multi-Key Rotation System
  * Cycles through up to 3 keys from environment variables.
- * Handles rate limits (429) by automatically switching to the next available key.
  */
 class RotatingAIProvider {
   private keys: string[];
@@ -13,7 +12,6 @@ class RotatingAIProvider {
   private instances: Map<string, any> = new Map();
 
   constructor() {
-    // Collect keys from environment variables as requested
     this.keys = [
       process.env.API_KEY,
       (process as any).env.API_KEY_2,
@@ -35,13 +33,9 @@ class RotatingAIProvider {
   private rotate() {
     if (this.keys.length > 1) {
       this.currentIndex = (this.currentIndex + 1) % this.keys.length;
-      console.warn(`Gemini API: Rotating to key index ${this.currentIndex} due to rate limiting.`);
     }
   }
 
-  /**
-   * Executes AI generation with automatic retry and key rotation logic.
-   */
   async generate(params: any, retries = 2): Promise<any> {
     try {
       const ai = this.getClient();
@@ -52,7 +46,6 @@ class RotatingAIProvider {
       
       if (isRetryable && retries > 0) {
         this.rotate();
-        // Brief delay before retry to ensure the new key's context is ready
         await new Promise(resolve => setTimeout(resolve, 300));
         return this.generate(params, retries - 1);
       }
@@ -67,44 +60,33 @@ export const isAiReady = async () => {
   return !!process.env.API_KEY;
 };
 
-/**
- * Robust JSON extraction to handle markdown blocks or non-standard formatting from the model.
- */
 const cleanAndParseJSON = (text: string | undefined) => {
   if (!text) return null;
   try {
     const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanText);
   } catch (e) {
-    console.error("Critical: AI returned malformed JSON", text);
     return null;
   }
 };
 
 /**
- * Strict Telemetry Grounding
- * Forces the AI to use the provided sensor numbers for its reasoning.
+ * Comprehensive Telemetry Context
  */
 const formatDataForPrompt = (data: any) => {
   const safeVal = (val: any) => (val != null && !isNaN(Number(val))) ? Number(val).toFixed(2) : "N/A";
   
   return `
-    [MANDATORY TELEMETRY CONTEXT]
-    - Soil Moisture: ${safeVal(data.moisture)}% (Status: ${data.moisture < 20 ? 'CRITICAL DRY' : data.moisture > 75 ? 'SATURATED' : 'Optimal'})
-    - Soil pH: ${safeVal(data.ph_level)} (Status: ${data.ph_level < 5.5 ? 'ACIDIC' : data.ph_level > 8 ? 'ALKALINE' : 'Neutral'})
-    - NPK (ppm): N=${safeVal(data.npk_n)}, P=${safeVal(data.npk_p)}, K=${safeVal(data.npk_k)}
-    - Air Temp: ${safeVal(data.temperature)}°C
-    - Soil Profile: ${data.soil_type || 'Loamy'}
-
-    [STRICT INSTRUCTION]
-    You are a precision agricultural expert. You MUST prioritize these NUMBERS. 
-    If moisture is ${safeVal(data.moisture)}%, provide advice specifically for that level. 
-    Do not give generic summaries. If moisture is below 20%, you MUST suggest emergency irrigation.
-    If pH is below 5.5, you MUST suggest acidity correction.
+    [SENSOR DATA PILLARS]
+    1. MOISTURE: ${safeVal(data.moisture)}% (Thresholds: <20% Dry, >75% Saturated)
+    2. pH LEVEL: ${safeVal(data.ph_level)} (Acidity: <5.5 is harmful for NPK absorption)
+    3. NPK PROFILE (ppm): Nitrogen=${safeVal(data.npk_n)}, Phosphorus=${safeVal(data.npk_p)}, Potassium=${safeVal(data.npk_k)}
+    4. TEMPERATURE: ${safeVal(data.temperature)}°C
+    
+    FIELD CONTEXT: ${data.field_name} at ${data.location}, Soil Type: ${data.soil_type || 'Loamy'}.
   `;
 };
 
-// Use Gemini 2 Flash as requested
 const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
 
 export interface SoilInsight {
@@ -129,7 +111,7 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Generate 3 crop recommendations based on: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Suggest 3 crops considering NPK levels and Temperature constraints: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -159,7 +141,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Provide soil health diagnostic and strategy for: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Provide a Soil Restoration Strategy focusing on pH, Moisture and NPK balance. Analyze how pH ${latestData.ph_level} affects nutrient availability: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -182,7 +164,7 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Create management prescriptions for: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Create exact irrigation and nutrient prescriptions for these specific pillars: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -231,7 +213,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Build a 4-step action plan using: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Build a 4-step Operational Roadmap. Step 1 must address Moisture/Temp, Step 2 pH, Step 3 NPK, and Step 4 Long-term health: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -256,37 +238,39 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
 };
 
 // --- DYNAMIC DATA-AWARE FALLBACKS ---
-// These are safety checks if the AI is unreachable, but they still respect user telemetry.
 
 const getFallbackCrops = (data: any): CropRecommendation[] => {
   const isDry = (data.moisture || 45) < 20;
   return [
-    { name: isDry ? "Millets" : "Hybrid Rice", suitability: 90, yield: isDry ? "2.0t/ha" : "7.5t/ha", requirements: "Low water needed.", fertilizer: "Urea", icon: "fa-wheat-awn" },
-    { name: "Potato", suitability: 82, yield: "22t/ha", requirements: "Balanced NPK.", fertilizer: "MOP", icon: "fa-potato" },
-    { name: "Eggplant", suitability: 75, yield: "18t/ha", requirements: "Pest control.", fertilizer: "Organic", icon: "fa-seedling" }
+    { name: isDry ? "Millets" : "Hybrid Rice", suitability: 90, yield: isDry ? "2.0t/ha" : "7.5t/ha", requirements: "Resilient to current temp.", fertilizer: "Urea (High Nitrogen)", icon: "fa-wheat-awn" },
+    { name: "Potato", suitability: 82, yield: "22t/ha", requirements: "Needs loose soil.", fertilizer: "MOP (Potassium rich)", icon: "fa-potato" },
+    { name: "Eggplant", suitability: 75, yield: "18t/ha", requirements: "High Nitrogen needs.", fertilizer: "Organic Compost", icon: "fa-seedling" }
   ];
 };
 
 const getFallbackSoilInsight = (data: any): SoilInsight => {
   const isDry = (data.moisture || 45) < 20;
+  const isAcidic = (data.ph_level || 6.5) < 5.5;
   return {
-    summary: `Sensors detected ${isDry ? 'CRITICAL drought' : 'adequate moisture'}. Restore balance now.`,
-    soil_fertilizer: isDry ? "Immediate deep irrigation required." : "Apply 100kg organic compost."
+    summary: `Restoration priority: ${isDry ? 'WATER REPLENISHMENT' : (isAcidic ? 'pH CORRECTION' : 'NUTRIENT BOOST')}. Sensors show ${data.moisture.toFixed(0)}% moisture and ${data.ph_level.toFixed(1)} pH.`,
+    soil_fertilizer: isAcidic ? "Apply 250kg Agricultural Lime to neutralize acidity." : (isDry ? "Deep-bore irrigation required immediately." : "Apply 100kg balanced NPK complex.")
   };
 };
 
 const getFallbackPrescription = (data: any): ManagementPrescription => {
   const isDry = (data.moisture || 45) < 20;
   return {
-    irrigation: { needed: isDry, volume: isDry ? "15,000L" : "None", schedule: "Next 24h" },
-    nutrient: { needed: true, fertilizers: [{ type: "Balanced NPK", amount: "50kg" }], advice: "Standard supplement." }
+    irrigation: { needed: isDry, volume: isDry ? "15,000L/ha" : "Maintain monitoring", schedule: "Early Morning (5 AM)" },
+    nutrient: { needed: true, fertilizers: [{ type: "Urea", amount: "50kg" }, { type: "TSP", amount: "30kg" }], advice: "Apply after first irrigation cycle." }
   };
 };
 
 const getFallbackPlan = (data: any) => {
   const isDry = (data.moisture || 45) < 20;
   return [
-    { priority: isDry ? "CRITICAL" : "HIGH", title: isDry ? "Emergency Rehydration" : "Soil Health Check", description: "Sensor readings indicate attention is needed.", icon: "fa-droplet" },
-    { priority: "MEDIUM", title: "Nutrient Sync", description: "Verify NPK balance.", icon: "fa-flask" }
+    { priority: isDry ? "CRITICAL" : "NORMAL", title: "Moisture Sync", description: isDry ? "Immediate hydration required to prevent root wilting." : "Moisture levels stable, monitor daily.", icon: "fa-droplet" },
+    { priority: "HIGH", title: "pH Stabilization", description: "Ensure pH is within 6.0-7.0 range for NPK uptake.", icon: "fa-scale-balanced" },
+    { priority: "MEDIUM", title: "NPK Amendment", description: "Apply Phosphorus-rich fertilizer to boost root vigor.", icon: "fa-flask" },
+    { priority: "LOW", title: "Temperature Shielding", description: "Apply mulch if soil temp exceeds 30°C.", icon: "fa-sun" }
   ];
 };
