@@ -3,34 +3,88 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field, CropRecommendation } from "../types";
 
 /**
- * Ensures we always use the latest environment API key.
- * The API key is obtained exclusively from the environment variable process.env.API_KEY.
+ * Multi-Key Rotation System
+ * Cycles through available keys to prevent quota exhaustion.
  */
-const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API_KEY_NOT_FOUND");
+class RotatingAIProvider {
+  private keys: string[];
+  private currentIndex: number = 0;
+
+  constructor() {
+    // Collect keys from environment variables
+    this.keys = [
+      process.env.API_KEY,
+      (process as any).env.API_KEY_2,
+      (process as any).env.API_KEY_3
+    ].filter(k => k && k.length > 5) as string[];
   }
-  return new GoogleGenAI({ apiKey });
-};
+
+  private getNextClient() {
+    if (this.keys.length === 0) throw new Error("NO_API_KEYS_AVAILABLE");
+    const key = this.keys[this.currentIndex];
+    return new GoogleGenAI({ apiKey: key });
+  }
+
+  private rotate() {
+    this.currentIndex = (this.currentIndex + 1) % this.keys.length;
+    console.warn(`Rotating to API Key Index: ${this.currentIndex}`);
+  }
+
+  /**
+   * Executes a prompt with automatic retry on 429/quota errors
+   */
+  async generateWithRotation(params: any, retries = 2): Promise<any> {
+    try {
+      const ai = this.getNextClient();
+      return await ai.models.generateContent(params);
+    } catch (error: any) {
+      const isQuotaError = error.message?.includes("429") || error.message?.includes("quota");
+      if (isQuotaError && retries > 0 && this.keys.length > 1) {
+        this.rotate();
+        return this.generateWithRotation(params, retries - 1);
+      }
+      throw error;
+    }
+  }
+}
+
+const aiProvider = new RotatingAIProvider();
 
 export const isAiReady = async () => {
-  return !!process.env.API_KEY && process.env.API_KEY.length > 5;
+  return !!process.env.API_KEY;
 };
 
+const cleanAndParseJSON = (text: string | undefined) => {
+  if (!text) return null;
+  try {
+    const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(cleanText);
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Strict Data Formatting
+ * Forces the AI to acknowledge telemetry before reasoning.
+ */
 const formatDataForPrompt = (data: any) => {
-  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "N/A";
+  const safeVal = (val: any) => (val != null && !isNaN(Number(val))) ? Number(val).toFixed(2) : "N/A";
+  
   return `
-    FIELD TELEMETRY:
-    - Soil Moisture: ${safeVal(data.moisture)}%
-    - pH Level: ${safeVal(data.ph_level)}
-    - Ambient Temperature: ${safeVal(data.temperature)}°C
-    - Nutrient Profile (NPK): Nitrogen=${safeVal(data.npk_n)}, Phosphorus=${safeVal(data.npk_p)}, Potassium=${safeVal(data.npk_k)}
-    - Location Context: ${data.location || 'Bangladesh'}
-    - Soil Profile: ${data.soil_type || 'Loamy'}
-    - Field Size: ${data.size || 1.0} Hectares
+    [ACTUAL SENSOR TELEMETRY - MANDATORY CONTEXT]
+    - Moisture: ${safeVal(data.moisture)}% (CRITICAL: <20% is extreme drought, >80% is waterlogged)
+    - pH: ${safeVal(data.ph_level)} (CRITICAL: <5.5 is highly acidic)
+    - NPK (ppm): Nitrogen=${safeVal(data.npk_n)}, Phosphorus=${safeVal(data.npk_p)}, Potassium=${safeVal(data.npk_k)}
+    - Temp: ${safeVal(data.temperature)}°C
+    - Soil: ${data.soil_type || 'Loamy'}
+
+    [STRICT INSTRUCTION]
+    You are a precision agronomist. Use the NUMBERS above. If moisture is ${safeVal(data.moisture)}%, your advice MUST address that specific level. Do not provide generic winter/summer advice if the sensors show otherwise.
   `;
 };
+
+const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
 
 export interface SoilInsight {
   summary: string;
@@ -52,10 +106,9 @@ export interface ManagementPrescription {
 
 export const getCropAnalysis = async (field: Field, latestData: any): Promise<CropRecommendation[]> => {
   try {
-    const ai = getAIClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are a world-class senior agronomist. Analyze the following soil telemetry and suggest 3 specific vegetables or crops that will result in a GREAT HARVEST for this specific soil and location. For each, specify the EXACT PERFECT FERTILIZER required to maximize that specific crop's yield. ${formatDataForPrompt({...latestData, ...field})}`,
+    const response = await aiProvider.generateWithRotation({
+      model: MODEL_NAME,
+      contents: `Based on these specific readings, suggest 3 crops: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -75,24 +128,18 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
         }
       }
     });
-    
-    return JSON.parse(response.text || "[]");
+    return cleanAndParseJSON(response.text) || [];
   } catch (error) {
-    console.error("AI Crop analysis failed, using fallback.");
-    return [
-      { name: "Boro Rice (Hybrid)", suitability: 94, yield: "7.2 Tons/ha", requirements: "Maintain high water levels and Nitrogen focus.", fertilizer: "Urea + DAP Blend", icon: "fa-wheat-awn" },
-      { name: "High-Yield Brinjal", suitability: 88, yield: "28 Tons/ha", requirements: "Consistent moisture and high Potassium.", fertilizer: "MOP + Organic Compost", icon: "fa-eggplant" },
-      { name: "Winter Potato", suitability: 82, yield: "22 Tons/ha", requirements: "Well-aerated soil and balanced NPK.", fertilizer: "Balanced 10-10-10 Mix", icon: "fa-potato" }
-    ];
+    console.error("Gemini 2.5 Flash Rotation Error:", error);
+    return [];
   }
 };
 
 export const getSoilHealthSummary = async (field: Field, latestData: any): Promise<SoilInsight> => {
   try {
-    const ai = getAIClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are a senior soil scientist. Analyze the soil health of "${field.field_name}" and provide a concise restoration strategy. Suggest the specific treatment or conditioner (Lime, Gypsum, etc.) needed to fix the soil itself. ${formatDataForPrompt({...latestData, ...field})}`,
+    const response = await aiProvider.generateWithRotation({
+      model: MODEL_NAME,
+      contents: `Synthesize a soil restoration summary based on: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -105,22 +152,17 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
         }
       }
     });
-    
-    return JSON.parse(response.text || "{}");
+    return cleanAndParseJSON(response.text) || { summary: "Syncing data...", soil_fertilizer: "Calculating..." };
   } catch (error) {
-    return {
-      summary: "Soil diagnostics show stable moisture levels. Priority should be given to organic matter enrichment to improve nutrient cation exchange capacity.",
-      soil_fertilizer: "Apply 500kg of Vermicompost per hectare and monitor pH trends."
-    };
+    return { summary: "Analysis temporarily offline.", soil_fertilizer: "Check local sensors." };
   }
 };
 
 export const getManagementPrescriptions = async (field: Field, latestData: any): Promise<ManagementPrescription> => {
   try {
-    const ai = getAIClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are a precision agronomist. Analyze this field's real-time telemetry and provide a specific Irrigation Plan and a Nutrient Cycle (Fertilizer) plan. Calculate exact water volumes (liters) and fertilizer dosages (kg/ha) based on the field size. ${formatDataForPrompt({...latestData, ...field})}`,
+    const response = await aiProvider.generateWithRotation({
+      model: MODEL_NAME,
+      contents: `Generate irrigation and nutrient plan: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -130,8 +172,8 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
               type: Type.OBJECT,
               properties: {
                 needed: { type: Type.BOOLEAN },
-                volume: { type: Type.STRING, description: "e.g. 5,000 Liters" },
-                schedule: { type: Type.STRING, description: "When to apply, e.g. Early Morning" }
+                volume: { type: Type.STRING },
+                schedule: { type: Type.STRING }
               },
               required: ["needed", "volume", "schedule"]
             },
@@ -144,8 +186,8 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
                   items: {
                     type: Type.OBJECT,
                     properties: {
-                      type: { type: Type.STRING, description: "e.g. Urea" },
-                      amount: { type: Type.STRING, description: "e.g. 15 kg/ha" }
+                      type: { type: Type.STRING },
+                      amount: { type: Type.STRING }
                     },
                     required: ["type", "amount"]
                   }
@@ -159,23 +201,17 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
         }
       }
     });
-    
-    return JSON.parse(response.text || "{}");
+    return cleanAndParseJSON(response.text);
   } catch (error) {
-    console.error("AI Prescriptions failed", error);
-    return {
-      irrigation: { needed: true, volume: "Calculated from sensor", schedule: "Early morning" },
-      nutrient: { needed: true, fertilizers: [{ type: "Urea", amount: "10kg/ha" }], advice: "Follow standard NPK balancing." }
-    };
+    throw error;
   }
 };
 
 export const getDetailedManagementPlan = async (field: Field, latestData: any) => {
   try {
-    const ai = getAIClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: `You are an agricultural consultant. Create a prioritized 4-step roadmap for soil restoration and harvest success based on this field's data. ${formatDataForPrompt({...latestData, ...field})}`,
+    const response = await aiProvider.generateWithRotation({
+      model: MODEL_NAME,
+      contents: `Action roadmap based on sensors: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -193,14 +229,8 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
         }
       }
     });
-    
-    return JSON.parse(response.text || "[]");
+    return cleanAndParseJSON(response.text) || [];
   } catch (error) {
-    return [
-      { priority: "High", title: "Organic Mulching", description: "Apply a 2-inch layer of organic mulch to preserve soil moisture and regulate temperature.", icon: "fa-leaf" },
-      { priority: "Medium", title: "NPK Balancing", description: "Supplement with specific Nitrogen-rich fertilizer based on current deficits.", icon: "fa-flask" },
-      { priority: "Medium", title: "pH Correction", description: "Use agricultural lime to normalize soil acidity for better nutrient absorption.", icon: "fa-scale-balanced" },
-      { priority: "Low", title: "Microbial Boost", description: "Introduce beneficial soil microbes via compost tea to enhance root health.", icon: "fa-bacteria" }
-    ];
+    return [];
   }
 };

@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Field } from '../../types';
-import { generateMockSensorData } from '../../constants';
-import { syncFields, getManualDiagnosticsForFields } from '../../services/db';
+import { syncFields, syncSensorsFromDb } from '../../services/db';
 import { getManagementPrescriptions, ManagementPrescription } from '../../services/gemini';
 
 interface FieldWithAI extends ManagementPrescription {
@@ -21,25 +20,38 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
       const userFields = await syncFields(user.id);
       
       if (userFields.length > 0) {
-        const fieldIds = userFields.map(f => f.field_id);
-        const manualDiags = await getManualDiagnosticsForFields(fieldIds);
+        // Fetch current sensor states for all fields
+        const allSensors = await syncSensorsFromDb(userFields);
         
         const initialData: FieldWithAI[] = userFields.map(f => {
-          const mock = generateMockSensorData(f.field_id)[6];
-          const manual = manualDiags[f.field_id];
-          const data = manual ? {
-            ...mock,
-            moisture: manual.moisture ?? mock.moisture,
-            temperature: manual.temp ?? mock.temperature,
-            ph_level: manual.ph ?? mock.ph_level,
-            npk_n: manual.n ?? mock.npk_n,
-            npk_p: manual.p ?? mock.npk_p,
-            npk_k: manual.k ?? mock.npk_k
-          } : mock;
+          const fieldSensors = allSensors.filter(s => s.field_id === f.field_id);
+          
+          // Aggregate sensor readings into a unified state for the AI
+          const stats: any = { 
+            temperature: 25.0,
+            moisture: 45.0, 
+            ph_level: 6.5, 
+            npk_n: 50, 
+            npk_p: 40, 
+            npk_k: 60 
+          };
+
+          fieldSensors.forEach(s => {
+            if (!s.last_reading) return;
+            const t = s.sensor_type.toLowerCase();
+            if (t.includes('moisture')) stats.moisture = s.last_reading.value ?? stats.moisture;
+            if (t.includes('temp')) stats.temperature = s.last_reading.value ?? stats.temperature;
+            if (t.includes('ph')) stats.ph_level = s.last_reading.value ?? stats.ph_level;
+            if (t.includes('npk')) { 
+              stats.npk_n = s.last_reading.n ?? stats.npk_n; 
+              stats.npk_p = s.last_reading.p ?? stats.npk_p; 
+              stats.npk_k = s.last_reading.k ?? stats.npk_k; 
+            }
+          });
 
           return {
             field: f,
-            data,
+            data: stats,
             aiLoading: true,
             irrigation: { needed: false, volume: '...', schedule: '...' },
             nutrient: { needed: false, fertilizers: [], advice: '...' }
@@ -59,7 +71,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
               return updated;
             });
           } catch (err) {
-            console.error(`AI failed for field ${item.field.field_id}`, err);
+            console.error(`AI sync failed for field ${item.field.field_id}`, err);
             setFieldData(prev => {
               const updated = [...prev];
               updated[index].aiLoading = false;
@@ -90,6 +102,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
       reportContent += `CURRENT DIAGNOSTIC STATE:\n`;
       reportContent += `- Temperature: ${data.temperature.toFixed(1)}°C\n`;
       reportContent += `- Moisture: ${data.moisture.toFixed(1)}%\n`;
+      reportContent += `- pH Level: ${data.ph_level.toFixed(1)}\n`;
       reportContent += `- Nutrient Profile (NPK): ${data.npk_n.toFixed(0)}-${data.npk_p.toFixed(0)}-${data.npk_k.toFixed(0)}\n\n`;
 
       reportContent += `AI PRESCRIPTIVE ACTIONS:\n`;
