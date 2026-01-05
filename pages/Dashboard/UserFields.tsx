@@ -5,7 +5,6 @@ import {
   getCropAnalysis, 
   getSoilHealthSummary, 
   getDetailedManagementPlan, 
-  isAiReady,
   SoilInsight
 } from '../../services/gemini';
 import { syncFields, syncSensorsFromDb, addFieldToDb } from '../../services/db';
@@ -55,6 +54,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const handleFieldSelect = async (field: Field) => {
     setSelectedField(field);
     setLoading(true);
+    setRecommendations(null);
+    setSoilInsight(null);
+    setManagementPlan(null);
     
     try {
       const fieldSensors = await syncSensorsFromDb([field]);
@@ -81,10 +83,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      // Fetch AI data - always fetch to ensure recommendations are shown (fallbacks are in gemini.ts)
+      // Check key state before AI calls
       const hasKey = await (window as any).aistudio.hasSelectedApiKey();
       setAiActive(hasKey);
 
+      // AI calls proceed (gemini.ts handles the key via process.env.API_KEY internally)
       const [analysis, insight, plan] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
@@ -95,7 +98,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setSoilInsight(insight);
       setManagementPlan(plan);
     } catch (err) {
-      console.error("Critical AI error", err);
+      console.error("Critical AI node error", err);
     } finally {
       setLoading(false);
     }
@@ -121,8 +124,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen">
       <div className="flex justify-between items-center mb-12">
         <div>
-          <h1 className="text-3xl font-black text-slate-900">AI Agronomy Hub</h1>
-          <p className="text-slate-500 text-sm mt-1">Deep-soil telemetry synthesized by shared Gemini AI nodes.</p>
+          <h1 className="text-3xl font-black text-slate-900">Agricare Intelligence Hub</h1>
+          <p className="text-slate-500 text-sm mt-1">Real-time soil diagnostics synthesized by shared Gemini AI nodes.</p>
         </div>
         <div className="flex gap-4">
           {!aiActive && (
@@ -130,14 +133,14 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               onClick={handleActivateAi}
               className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg active:scale-95"
             >
-              <i className="fas fa-key"></i> Connect Gemini AI
+              <i className="fas fa-key"></i> Sync Shared API
             </button>
           )}
           <button 
             onClick={() => setShowAddFieldModal(true)} 
             className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
           >
-            <i className="fas fa-plus"></i> Add New Plot
+            <i className="fas fa-plus"></i> Add New Field
           </button>
         </div>
       </div>
@@ -176,18 +179,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                 <i className="fas fa-microscope text-4xl text-slate-200"></i>
               </div>
-              <h3 className="text-slate-400 font-bold text-xl">Select a plot to initiate soil diagnostics.</h3>
+              <h3 className="text-slate-400 font-bold text-xl">Select a field to initiate AI diagnostics.</h3>
             </div>
           ) : (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
+            <div className="space-y-8 animate-in fade-in duration-700">
+              {/* Field Header Card */}
               <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full"></div>
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}`}>
-                        <i className={`fas ${aiActive ? 'fa-robot' : 'fa-wave-square'}`}></i>
-                        {aiActive ? 'Advanced AI Enabled' : 'Basic Analysis Active'}
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                        <i className={`fas ${aiActive ? 'fa-robot' : 'fa-triangle-exclamation'}`}></i>
+                        {aiActive ? 'Shared AI Active' : 'API Key Required'}
                       </div>
                     </div>
                     <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
@@ -207,7 +211,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <div className="w-px h-6 bg-white/10 hidden md:block"></div>
                     <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.npk_n != null ? 'text-emerald-400' : 'text-slate-600'}`}>
                       <i className={`fas ${currentDataState?.npk_n != null ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>NPK ONLINE</span>
+                      <span>NPK SYNCED</span>
                     </div>
                   </div>
                 </div>
@@ -216,18 +220,20 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading && !recommendations ? (
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
-                  <h3 className="text-2xl font-black text-slate-800">Calculating Field Optimization...</h3>
-                  <p className="text-slate-400 mt-2">Correlating telemetry with regional agricultural models.</p>
+                  <h3 className="text-2xl font-black text-slate-800">Synthesizing Restoration Plan...</h3>
+                  <p className="text-slate-400 mt-2">Connecting to shared Gemini AI processing node for agronomical analysis.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left Main Column */}
                   <div className="lg:col-span-2 space-y-8">
+                    {/* Restoration Card */}
                     <div className="bg-white p-10 rounded-[3rem] border border-emerald-50 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-8 text-emerald-500/5 text-8xl transition-transform group-hover:scale-110">
                         <i className="fas fa-flask-vial"></i>
                       </div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-6 flex items-center gap-3">
-                        <i className="fas fa-vial-circle-check text-emerald-600"></i> AI Restoration Strategy
+                        <i className="fas fa-vial-circle-check text-emerald-600"></i> AI Soil Restoration Strategy
                       </h3>
                       
                       <div className="space-y-6">
@@ -244,7 +250,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                             <div>
                               <div className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Recommended Treatment</div>
-                              <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || "Determining soil conditioner..."}</div>
+                              <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || "Determining ideal soil conditioner..."}</div>
                             </div>
                           </div>
                           <i className="fas fa-shield-virus text-emerald-400/20 text-3xl"></i>
@@ -252,9 +258,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                     </div>
                     
+                    {/* Crop Index */}
                     <div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
-                        <i className="fas fa-chart-line text-emerald-600"></i> AI High-Yield Index
+                        <i className="fas fa-chart-line text-emerald-600"></i> AI High-Yield Crop & Harvest Index
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {recommendations && recommendations.length > 0 ? (
@@ -292,14 +299,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
                             <i className="fas fa-robot text-4xl mb-4 block opacity-20"></i>
-                            <p className="font-bold">Gathering AI analysis...</p>
-                            {!aiActive && <button onClick={handleActivateAi} className="mt-4 text-emerald-600 font-bold hover:underline">Click to Sync Gemini AI</button>}
+                            <p className="font-bold">Collecting baseline metrics for harvest analysis.</p>
+                            {!aiActive && (
+                              <button onClick={handleActivateAi} className="mt-4 text-emerald-600 font-bold hover:underline">
+                                Click to Activate Shared AI
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
                   
+                  {/* Right Roadmap Column */}
                   <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm h-fit sticky top-24">
                     <h3 className="font-bold text-2xl text-slate-900 mb-10 flex items-center gap-3">
                       <i className="fas fa-list-check text-emerald-600"></i> AI Restoration Roadmap
@@ -323,7 +335,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto opacity-20">
                              <i className="fas fa-clipboard-list text-3xl"></i>
                            </div>
-                           <p className="text-slate-400 font-medium text-sm px-6 italic">Synchronizing restoration roadmap...</p>
+                           <p className="text-slate-400 font-medium text-sm px-6 italic">Establishing your restoration roadmap based on current telemetry.</p>
                         </div>
                       )}
                     </div>
@@ -338,7 +350,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       {showAddFieldModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-300">
-            <h2 className="text-3xl font-black mb-8 text-slate-900">Deploy New Node</h2>
+            <h2 className="text-3xl font-black mb-8 text-slate-900">Deploy New Plot</h2>
             <form onSubmit={handleAddField} className="space-y-6">
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Field Descriptor</label>

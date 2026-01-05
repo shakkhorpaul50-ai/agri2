@@ -4,6 +4,7 @@ import { Field, CropRecommendation } from "../types";
 
 /**
  * Ensures we always use the latest environment API key.
+ * The API key is obtained exclusively from the environment variable process.env.API_KEY.
  */
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
@@ -20,13 +21,13 @@ export const isAiReady = async () => {
 const formatDataForPrompt = (data: any) => {
   const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "N/A";
   return `
-    FIELD DATA:
-    - Moisture: ${safeVal(data.moisture)}%
-    - pH: ${safeVal(data.ph_level)}
-    - Temp: ${safeVal(data.temperature)}°C
-    - NPK: ${safeVal(data.npk_n)}-${safeVal(data.npk_p)}-${safeVal(data.npk_k)}
-    - Location: ${data.location || 'Bangladesh'}
-    - Soil: ${data.soil_type || 'Loamy'}
+    FIELD TELEMETRY:
+    - Soil Moisture: ${safeVal(data.moisture)}%
+    - pH Level: ${safeVal(data.ph_level)}
+    - Ambient Temperature: ${safeVal(data.temperature)}°C
+    - Nutrient Profile (NPK): Nitrogen=${safeVal(data.npk_n)}, Phosphorus=${safeVal(data.npk_p)}, Potassium=${safeVal(data.npk_k)}
+    - Location Context: ${data.location || 'Bangladesh'}
+    - Soil Profile: ${data.soil_type || 'Loamy'}
   `;
 };
 
@@ -40,7 +41,7 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `You are an expert agronomist. Analyze this data and suggest 3 crops for high yield. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `You are a world-class senior agronomist. Analyze the following soil telemetry and suggest 3 specific vegetables or crops that will result in a GREAT HARVEST for this specific soil and location. For each, specify the EXACT PERFECT FERTILIZER required to maximize that specific crop's yield. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -63,11 +64,11 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
     
     return JSON.parse(response.text || "[]");
   } catch (error) {
-    console.error("AI Crop analysis failed, using agronomist fallback.");
+    console.error("AI Crop analysis failed, using fallback.");
     return [
-      { name: "High-Yield Boro Rice", suitability: 92, yield: "6.5 Tons/ha", requirements: "Maintain high moisture and Nitrogen", fertilizer: "Urea (80kg/ha) + DAP (40kg/ha)", icon: "fa-wheat-awn" },
-      { name: "Hybrid Brinjal", suitability: 85, yield: "25 Tons/ha", requirements: "Regular watering, rich potash", fertilizer: "MOP (30kg/ha) + Organic Compost", icon: "fa-eggplant" },
-      { name: "Potato (Diamond)", suitability: 78, yield: "20 Tons/ha", requirements: "Well-drained loamy soil", fertilizer: "Balanced NPK 10-10-10", icon: "fa-potato" }
+      { name: "Boro Rice (Hybrid)", suitability: 94, yield: "7.2 Tons/ha", requirements: "Maintain high water levels and Nitrogen focus.", fertilizer: "Urea + DAP Blend", icon: "fa-wheat-awn" },
+      { name: "High-Yield Brinjal", suitability: 88, yield: "28 Tons/ha", requirements: "Consistent moisture and high Potassium.", fertilizer: "MOP + Organic Compost", icon: "fa-eggplant" },
+      { name: "Winter Potato", suitability: 82, yield: "22 Tons/ha", requirements: "Well-aerated soil and balanced NPK.", fertilizer: "Balanced 10-10-10 Mix", icon: "fa-potato" }
     ];
   }
 };
@@ -77,7 +78,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Provide a detailed soil restoration strategy for this field. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `You are a senior soil scientist. Analyze the soil health of "${field.field_name}" and provide a concise restoration strategy. Suggest the specific treatment or conditioner (Lime, Gypsum, etc.) needed to fix the soil itself. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -105,7 +106,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Create a 4-step restoration roadmap for this field. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `You are an agricultural consultant. Create a prioritized 4-step roadmap for soil restoration and harvest success based on this field's data. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
