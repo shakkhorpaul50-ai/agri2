@@ -8,7 +8,6 @@ import Pricing from './pages/Pricing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Overview from './pages/Dashboard/Overview';
-import UserFields from './pages/Dashboard/UserFields';
 import Sensors from './pages/Dashboard/Sensors';
 import Management from './pages/Dashboard/Management';
 import FeaturesPublic from './pages/FeaturesPublic';
@@ -90,7 +89,6 @@ const App: React.FC = () => {
       // Auth Protected
       case 'dashboard': return isLoggedIn ? <Overview user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
       case 'management': return isLoggedIn ? <Management user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
-      case 'fields': return isLoggedIn ? <UserFields user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
       case 'sensors': return isLoggedIn ? <Sensors user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
       
       default: return <Home onGetStarted={() => navigateTo('signup')} />;

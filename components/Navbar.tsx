@@ -15,7 +15,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, isLoggedIn, on
     ? [
         { id: 'dashboard', label: 'Dashboard' },
         { id: 'management', label: 'Management' },
-        { id: 'fields', label: 'My Fields' },
         { id: 'sensors', label: 'Sensors' }
       ]
     : [
