@@ -40,12 +40,12 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
           <h1 className="text-4xl font-black text-slate-900">Welcome, {user.name}</h1>
-          <p className="text-slate-500 mt-1">Your agricultural monitoring system is live and synced with Cloud Firestore.</p>
+          <p className="text-slate-500 mt-1">Your agricultural monitoring system is live and syncing field telemetry.</p>
         </div>
         <div className="flex flex-col items-end gap-3">
           <div className="flex items-center gap-3 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Cloud Connected</span>
+            <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">System Online</span>
           </div>
           <button 
             onClick={() => setShowAddFieldModal(true)}
@@ -57,7 +57,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
       </div>
 
       {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
             <i className="fas fa-map-location-dot text-xl"></i>
@@ -67,19 +67,12 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
         </div>
         
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
-            <i className="fas fa-cloud-arrow-up text-xl"></i>
-          </div>
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Database Sync</div>
-          <div className="text-2xl font-black text-slate-900">Agricare-4c725</div>
-        </div>
-
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-6">
             <i className="fas fa-shield-check text-xl"></i>
           </div>
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Data Integrity</div>
-          <div className="text-xl font-bold text-slate-800">Secured & Encrypted</div>
+          <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Data Security</div>
+          <div className="text-xl font-bold text-slate-800">End-to-End Encrypted</div>
+          <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">Cloud Protected Sync</div>
         </div>
       </div>
       

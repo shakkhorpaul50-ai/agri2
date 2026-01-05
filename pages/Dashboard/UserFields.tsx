@@ -17,6 +17,8 @@ interface ManagementTask {
   icon: string;
 }
 
+// Removed redundant window.aistudio declaration to fix conflicting type errors
+
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedField, setSelectedField] = useState<Field | null>(null);
@@ -24,23 +26,35 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [soilInsight, setSoilInsight] = useState<SoilInsight | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aiConnected, setAiConnected] = useState(false);
+  const [aiActive, setAiActive] = useState(false);
   const [currentDataState, setCurrentDataState] = useState<any>(null);
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
   const [newFieldData, setNewFieldData] = useState({ name: '', location: '', size: '', soilType: 'Loamy' });
 
   useEffect(() => {
     const init = async () => {
-      const ready = await isAiReady();
-      setAiConnected(ready);
       const userFields = await syncFields(user.id);
       setFields(userFields);
+      
+      // Use standard window.aistudio provided by the environment
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      setAiActive(hasKey);
+
       if (userFields.length > 0) {
         handleFieldSelect(userFields[0]);
       }
     };
     init();
   }, [user.id]);
+
+  const handleActivateAi = async () => {
+    // Use standard window.aistudio provided by the environment
+    await (window as any).aistudio.openSelectKey();
+    setAiActive(true);
+    if (selectedField) {
+      handleFieldSelect(selectedField);
+    }
+  };
 
   const handleFieldSelect = async (field: Field) => {
     setSelectedField(field);
@@ -71,19 +85,32 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      const ready = await isAiReady();
-      setAiConnected(ready);
+      // Fetch AI data only if active
+      // Use standard window.aistudio provided by the environment
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      setAiActive(hasKey);
 
-      // Fetch AI data
-      const [analysis, insight, plan] = await Promise.all([
-        getCropAnalysis(field, stats),
-        getSoilHealthSummary(field, stats),
-        getDetailedManagementPlan(field, stats)
-      ]);
-      
-      setRecommendations(analysis);
-      setSoilInsight(insight);
-      setManagementPlan(plan);
+      if (hasKey) {
+        const [analysis, insight, plan] = await Promise.all([
+          getCropAnalysis(field, stats),
+          getSoilHealthSummary(field, stats),
+          getDetailedManagementPlan(field, stats)
+        ]);
+        
+        setRecommendations(analysis);
+        setSoilInsight(insight);
+        setManagementPlan(plan);
+      } else {
+        // Use fallbacks if key is not yet selected but proceed as requested
+        const [analysis, insight, plan] = await Promise.all([
+          getCropAnalysis(field, stats),
+          getSoilHealthSummary(field, stats),
+          getDetailedManagementPlan(field, stats)
+        ]);
+        setRecommendations(analysis);
+        setSoilInsight(insight);
+        setManagementPlan(plan);
+      }
     } catch (err) {
       console.error("Critical AI error", err);
     } finally {
@@ -114,12 +141,22 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           <h1 className="text-3xl font-black text-slate-900">AI Agronomy Hub</h1>
           <p className="text-slate-500 text-sm mt-1">Real-time soil telemetry synthesized by shared Gemini AI nodes.</p>
         </div>
-        <button 
-          onClick={() => setShowAddFieldModal(true)} 
-          className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
-        >
-          <i className="fas fa-plus"></i> Add New Field
-        </button>
+        <div className="flex gap-4">
+          {!aiActive && (
+            <button 
+              onClick={handleActivateAi}
+              className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+            >
+              <i className="fas fa-key"></i> Sync Shared API
+            </button>
+          )}
+          <button 
+            onClick={() => setShowAddFieldModal(true)} 
+            className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+          >
+            <i className="fas fa-plus"></i> Add New Field
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -165,9 +202,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                        <i className={`fas ${aiConnected ? 'fa-robot' : 'fa-wave-square'}`}></i>
-                        {aiConnected ? 'Shared AI Node Active' : 'Offline Node Processing'}
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                        <i className={`fas ${aiActive ? 'fa-robot' : 'fa-triangle-exclamation'}`}></i>
+                        {aiActive ? 'Shared API Active' : 'AI Node Inactive'}
                       </div>
                     </div>
                     <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
@@ -234,7 +271,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     
                     <div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
-                        <i className="fas fa-chart-line text-emerald-600"></i> High-Yield Crop Index
+                        <i className="fas fa-chart-line text-emerald-600"></i> AI High-Yield Crop Index
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {recommendations && recommendations.length > 0 ? (
@@ -272,7 +309,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
                             <i className="fas fa-robot text-4xl mb-4 block opacity-20"></i>
-                            <p className="font-bold">Syncing AI recommendations...</p>
+                            <p className="font-bold">Gathering AI analysis...</p>
+                            {!aiActive && <button onClick={handleActivateAi} className="mt-4 text-emerald-600 font-bold hover:underline">Click to Sync Shared API Key</button>}
                           </div>
                         )}
                       </div>
@@ -302,7 +340,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto opacity-20">
                              <i className="fas fa-clipboard-list text-3xl"></i>
                            </div>
-                           <p className="text-slate-400 font-medium text-sm px-6">Establishing your restoration roadmap...</p>
+                           <p className="text-slate-400 font-medium text-sm px-6 italic">Synchronizing your restoration roadmap...</p>
                         </div>
                       )}
                     </div>
