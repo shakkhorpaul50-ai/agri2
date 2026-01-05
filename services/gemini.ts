@@ -35,7 +35,7 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `You are an expert agronomist. Analyze this sensor data and recommend 3 ideal crops/vegetables. For each, specify a perfect fertilizer strategy (e.g. Urea, TSP, MOP, or Organic Compost) based on current soil NPK/pH. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `You are an expert agronomist. Based on the provided NPK and pH data, suggest 3 specific crops or vegetables that will have a GREAT HARVEST in these conditions. For each, suggest the EXACT PERFECT FERTILIZER strategy (e.g. Urea, TSP, MOP, Gypsum, or specific Organic Compost) required to optimize growth for that specific plant in this soil. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -43,12 +43,12 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
           items: {
             type: Type.OBJECT,
             properties: {
-              name: { type: Type.STRING },
-              suitability: { type: Type.NUMBER },
-              yield: { type: Type.STRING },
-              requirements: { type: Type.STRING },
-              fertilizer: { type: Type.STRING, description: "Specific fertilizer recommendation for this crop and current soil" },
-              icon: { type: Type.STRING }
+              name: { type: Type.STRING, description: "Name of the crop or vegetable" },
+              suitability: { type: Type.NUMBER, description: "Match percentage (0-100)" },
+              yield: { type: Type.STRING, description: "Estimated harvest potential" },
+              requirements: { type: Type.STRING, description: "Key growing conditions needed" },
+              fertilizer: { type: Type.STRING, description: "Specific fertilizer recommendation for this crop given the current soil deficit" },
+              icon: { type: Type.STRING, description: "FontAwesome icon name (e.g. fa-carrot, fa-seedling)" }
             },
             required: ["name", "suitability", "yield", "requirements", "fertilizer", "icon"]
           }
@@ -70,9 +70,9 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Based on this data, provide a 3-sentence expert summary focusing strictly on HOW TO IMPROVE THE SOIL HEALTH (e.g. organic matter, lime for pH, specific nitrogen fixing). ${formatDataForPrompt({...latestData, ...field})}`
+      contents: `Provide a 3-sentence expert summary on HOW TO IMPROVE THE HEALTH of this specific field's soil. Focus on pH restoration, organic matter replenishment, and nutrient balancing. Be scientifically specific. ${formatDataForPrompt({...latestData, ...field})}`
     });
-    return response.text || "Diagnostic complete. Focus on increasing organic carbon content.";
+    return response.text || "Diagnostic complete. Monitor NPK levels closely.";
   } catch (error: any) {
     console.error("Soil summary failed", error);
     return "Soil health is currently stable. Recommend adding vermicompost to improve microbial activity and moisture retention.";
@@ -84,7 +84,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Create a prioritized 4-step roadmap for "${field.field_name}". Steps MUST include specific SOIL IMPROVEMENT actions (pH balancing, nutrient fixing) and CROP MANAGEMENT. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Create a prioritized 4-step SOIL IMPROVEMENT AND HARVEST ROADMAP for "${field.field_name}". Steps MUST include specific actions to improve soil quality (like liming for acidity, adding potash for strength) and timing for the recommended harvest. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -92,10 +92,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
           items: {
             type: Type.OBJECT,
             properties: {
-              priority: { type: Type.STRING },
-              title: { type: Type.STRING },
-              description: { type: Type.STRING },
-              icon: { type: Type.STRING }
+              priority: { type: Type.STRING, description: "High, Medium, or Low" },
+              title: { type: Type.STRING, description: "Short title of the improvement task" },
+              description: { type: Type.STRING, description: "Detailed instruction on how to perform the soil restoration" },
+              icon: { type: Type.STRING, description: "FontAwesome icon name" }
             },
             required: ["priority", "title", "description", "icon"]
           }
