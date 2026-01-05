@@ -30,8 +30,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   useEffect(() => {
     const init = async () => {
-      setAiConnected(await isAiReady());
-      setFields(await syncFields(user.id));
+      const ready = await isAiReady();
+      setAiConnected(ready);
+      const userFields = await syncFields(user.id);
+      setFields(userFields);
+      if (userFields.length > 0) {
+        handleFieldSelect(userFields[0]);
+      }
     };
     init();
   }, [user.id]);
@@ -45,14 +50,26 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     
     try {
       const fieldSensors = await syncSensorsFromDb([field]);
-      const stats: any = { temperature: null, moisture: null, ph_level: null, npk_n: null, npk_p: null, npk_k: null };
+      const stats: any = { 
+        temperature: null, 
+        moisture: null, 
+        ph_level: null, 
+        npk_n: null, 
+        npk_p: null, 
+        npk_k: null 
+      };
+      
       fieldSensors.forEach(s => {
         if (!s.last_reading) return;
         const t = s.sensor_type.toLowerCase();
         if (t.includes('moisture')) stats.moisture = s.last_reading.value;
         if (t.includes('temp')) stats.temperature = s.last_reading.value;
         if (t.includes('ph')) stats.ph_level = s.last_reading.value;
-        if (t.includes('npk')) { stats.npk_n = s.last_reading.n; stats.npk_p = s.last_reading.p; stats.npk_k = s.last_reading.k; }
+        if (t.includes('npk')) { 
+          stats.npk_n = s.last_reading.n; 
+          stats.npk_p = s.last_reading.p; 
+          stats.npk_k = s.last_reading.k; 
+        }
       });
       setCurrentDataState(stats);
 
@@ -67,7 +84,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setManagementPlan(plan);
       setAiConnected(await isAiReady());
     } catch (err) {
-      setAiSummary("Communication with the AI node failed.");
+      setAiSummary("Communication with the AI node failed. Please ensure your central API key is active.");
     } finally {
       setLoading(false);
     }
@@ -75,97 +92,203 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   const handleAddField = async (e: React.FormEvent) => {
     e.preventDefault();
-    const f: Field = { field_id: Date.now(), user_id: user.id, field_name: newFieldData.name, location: newFieldData.location, size: parseFloat(newFieldData.size) || 0, soil_type: newFieldData.soilType };
+    const f: Field = { 
+      field_id: Date.now(), 
+      user_id: user.id, 
+      field_name: newFieldData.name, 
+      location: newFieldData.location, 
+      size: parseFloat(newFieldData.size) || 0, 
+      soil_type: newFieldData.soilType 
+    };
     await addFieldToDb(f);
     setFields([...fields, f]);
     setShowAddFieldModal(false);
+    setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 min-h-[80vh]">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen">
+      {/* Top Header */}
+      <div className="flex justify-between items-center mb-12">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm">Automated diagnostic and analysis node.</p>
+          <h1 className="text-3xl font-black text-slate-900">Field Command Center</h1>
+          <p className="text-slate-500 text-sm mt-1">Real-time analysis using manual diagnostics and sensor telemetry.</p>
         </div>
-        <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">Add Field</button>
+        <button 
+          onClick={() => setShowAddFieldModal(true)} 
+          className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+        >
+          <i className="fas fa-plus"></i> Add New Field
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="space-y-4">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2">Managed Plots</div>
-          {fields.map(f => (
-            <button key={f.field_id} onClick={() => handleFieldSelect(f)} className={`w-full text-left p-6 rounded-2xl border transition-all ${selectedField?.field_id === f.field_id ? 'border-emerald-500 bg-emerald-50 shadow-md' : 'bg-white border-slate-100 hover:border-emerald-200'}`}>
-              <div className="font-bold text-slate-800">{f.field_name}</div>
-              <div className="text-sm text-slate-500 mt-1">{f.location}</div>
-            </button>
-          ))}
+        {/* Sidebar: YOUR FIELDS */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="flex justify-between items-center px-2">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Your Fields</h3>
+            <span className="text-xs font-bold text-slate-400">{fields.length}</span>
+          </div>
+          <div className="space-y-4 overflow-y-auto max-h-[70vh] pr-2 scrollbar-hide">
+            {fields.map(f => (
+              <button 
+                key={f.field_id} 
+                onClick={() => handleFieldSelect(f)} 
+                className={`w-full text-left p-6 rounded-2xl border transition-all duration-300 transform ${
+                  selectedField?.field_id === f.field_id 
+                    ? 'border-emerald-500 bg-emerald-50 shadow-md scale-[1.02]' 
+                    : 'bg-white border-slate-100 hover:border-emerald-200'
+                }`}
+              >
+                <div className="font-bold text-slate-800 text-lg mb-1">{f.field_name}</div>
+                <div className="text-sm text-slate-400 font-medium">{f.location}</div>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-tighter bg-white px-2 py-1 rounded shadow-sm text-slate-500">{f.soil_type}</span>
+                  <span className="text-[10px] font-bold text-slate-400">{f.size} ha</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
+        {/* Main Area */}
         <div className="lg:col-span-3">
           {!selectedField ? (
-            <div className="bg-white rounded-[3rem] p-24 text-center border-dashed border-2 border-slate-200">
-               <i className="fas fa-seedling text-4xl text-slate-200 mb-4 block"></i>
-               <h3 className="text-slate-400 font-bold">Select a field to run AI health diagnostics.</h3>
+            <div className="bg-white rounded-[3rem] p-32 text-center border-dashed border-2 border-slate-200 flex flex-col items-center">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                <i className="fas fa-seedling text-4xl text-slate-200"></i>
+              </div>
+              <h3 className="text-slate-400 font-bold text-xl">Select a field to run AI health diagnostics.</h3>
             </div>
           ) : (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="bg-slate-900 p-10 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
+              {/* Field Hero Summary Card */}
+              <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full"></div>
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-2 h-2 rounded-full ${aiConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{aiConnected ? 'AI Active' : 'AI Connection Error'}</span>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                        <i className={`fas ${aiConnected ? 'fa-robot' : 'fa-triangle-exclamation'}`}></i>
+                        {aiConnected ? 'AI Analysis Online' : 'AI Analysis Offline'}
+                      </div>
                     </div>
-                    <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
-                    <p className="text-slate-400 mt-1">{selectedField.location} • {selectedField.size} Hectares</p>
+                    <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
+                    <p className="text-slate-400 mt-2 text-lg font-medium">{selectedField.location} • {selectedField.size} Hectares</p>
                   </div>
-                  <div className="flex gap-4">
-                    {currentDataState?.moisture && <div className="bg-white/10 px-4 py-2 rounded-xl text-xs font-bold border border-white/5">MOISTURE {currentDataState.moisture}%</div>}
-                    {currentDataState?.ph_level && <div className="bg-white/10 px-4 py-2 rounded-xl text-xs font-bold border border-white/5">PH {currentDataState.ph_level}</div>}
+                  
+                  {/* Real-time Stat Pills */}
+                  <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10 flex flex-wrap gap-6 items-center">
+                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.moisture ? 'text-emerald-400' : 'text-slate-600'}`}>
+                      <i className={`fas ${currentDataState?.moisture ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
+                      <span>MOISTURE {currentDataState?.moisture ? `(${currentDataState.moisture}%)` : 'MISSING'}</span>
+                    </div>
+                    <div className="w-px h-6 bg-white/10 hidden md:block"></div>
+                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.ph_level ? 'text-emerald-400' : 'text-slate-600'}`}>
+                      <i className={`fas ${currentDataState?.ph_level ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
+                      <span>PH {currentDataState?.ph_level ? `(${currentDataState.ph_level})` : 'MISSING'}</span>
+                    </div>
+                    <div className="w-px h-6 bg-white/10 hidden md:block"></div>
+                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.npk_n ? 'text-emerald-400' : 'text-slate-600'}`}>
+                      <i className={`fas ${currentDataState?.npk_n ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
+                      <span>NPK {currentDataState?.npk_n ? 'SYNCED' : 'MISSING'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {loading ? (
-                <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100">
-                  <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-                  <h3 className="text-xl font-bold text-slate-800">Synthesizing Data...</h3>
+                <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
+                  <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
+                  <h3 className="text-2xl font-black text-slate-800">Synthesizing Cloud Telemetry...</h3>
+                  <p className="text-slate-400 mt-2">Connecting to central AI processing node.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-2 space-y-8">
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-emerald-50 shadow-sm relative overflow-hidden">
-                      <h3 className="font-bold text-xl text-slate-900 mb-6 flex items-center gap-2"><i className="fas fa-stethoscope text-emerald-600"></i> AI Soil Health Analysis</h3>
-                      <div className={`p-6 rounded-2xl ${!aiConnected ? 'bg-red-50 text-red-700' : 'text-slate-600'}`}>
-                        <p className="text-lg leading-relaxed font-medium">{aiSummary || "Telemetry data synced. Awaiting AI response."}</p>
+                    {/* Health Insights Card */}
+                    <div className="bg-white p-10 rounded-[3rem] border border-emerald-50 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-8 text-emerald-500/5 text-8xl transition-transform group-hover:scale-110">
+                        <i className="fas fa-dna"></i>
+                      </div>
+                      <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3">
+                        <i className="fas fa-stethoscope text-emerald-600"></i> AI Soil Health Insight
+                      </h3>
+                      <div className={`p-8 rounded-[2.5rem] ${!aiConnected ? 'bg-red-50 text-red-700' : 'bg-emerald-50/50 text-slate-700'} border border-emerald-50`}>
+                        <p className="text-lg leading-relaxed font-medium">
+                          {aiSummary || (aiConnected ? "Awaiting model response for sensor packets..." : "AI Analysis is currently offline. Please ensure your central API key is correctly configured in the environment.")}
+                        </p>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {recommendations?.map((r, i) => (
-                        <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 hover:shadow-lg transition-all">
-                          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-6"><i className={`fas ${r.icon || 'fa-wheat-awn'} text-xl`}></i></div>
-                          <h4 className="font-bold text-slate-900 text-lg">{r.name}</h4>
-                          <p className="text-sm text-slate-500 mt-4 leading-relaxed">{r.requirements}</p>
-                        </div>
-                      ))}
+                    {/* Crop Suitability Index */}
+                    <div>
+                      <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
+                        <i className="fas fa-chart-pie text-emerald-600"></i> Crop Suitability Index
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {recommendations && recommendations.length > 0 ? (
+                          recommendations.map((r, i) => (
+                            <div key={i} className="bg-white p-8 rounded-[3rem] border border-slate-100 hover:shadow-2xl transition-all hover:-translate-y-1">
+                              <div className="flex justify-between items-start mb-8">
+                                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center shadow-inner">
+                                  <i className={`fas ${r.icon || 'fa-seedling'} text-2xl`}></i>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[10px] font-black uppercase text-emerald-600 mb-1">Match</div>
+                                  <div className="text-2xl font-black text-slate-900">{r.suitability}%</div>
+                                </div>
+                              </div>
+                              <h4 className="font-black text-slate-900 text-xl mb-4">{r.name}</h4>
+                              <div className="h-2 w-full bg-slate-100 rounded-full mb-6 overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${r.suitability}%` }}></div>
+                              </div>
+                              <p className="text-sm text-slate-500 leading-relaxed bg-slate-50 p-4 rounded-2xl italic">"{r.requirements}"</p>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
+                            <i className="fas fa-image text-4xl mb-4 block opacity-20"></i>
+                            <p className="font-bold">No suitability data available for current telemetry.</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 h-fit">
-                    <h3 className="font-bold text-lg text-slate-900 mb-8 flex items-center gap-2"><i className="fas fa-road text-emerald-600"></i> Management Roadmap</h3>
-                    <div className="space-y-8">
-                      {managementPlan?.map((p, i) => (
-                        <div key={i} className="relative pl-6">
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 rounded-full"></div>
-                          <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">{p.priority} Priority</div>
-                          <h4 className="font-bold text-slate-900 mb-2">{p.title}</h4>
-                          <p className="text-xs text-slate-500 leading-relaxed">{p.description}</p>
+                  {/* Sidebar Right: Roadmap */}
+                  <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm h-fit sticky top-24">
+                    <h3 className="font-bold text-2xl text-slate-900 mb-10 flex items-center gap-3">
+                      <i className="fas fa-list-check text-emerald-600"></i> Localized Roadmap
+                    </h3>
+                    <div className="space-y-10">
+                      {managementPlan && managementPlan.length > 0 ? (
+                        managementPlan.map((p, i) => (
+                          <div key={i} className="relative pl-8">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 rounded-full"></div>
+                            <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${
+                              p.priority === 'High' ? 'text-red-500' : p.priority === 'Medium' ? 'text-orange-500' : 'text-emerald-500'
+                            }`}>
+                              {p.priority} Priority
+                            </div>
+                            <h4 className="font-black text-slate-900 mb-2">{p.title}</h4>
+                            <p className="text-xs text-slate-500 leading-relaxed">{p.description}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-20 space-y-6">
+                           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto opacity-20">
+                             <i className="fas fa-clipboard-list text-3xl"></i>
+                           </div>
+                           <p className="text-slate-400 font-medium text-sm px-6">Measurements required to generate your localized roadmap.</p>
                         </div>
-                      ))}
-                      {(!managementPlan || managementPlan.length === 0) && <div className="text-slate-300 text-sm font-medium italic">Roadmap pending AI activation.</div>}
+                      )}
                     </div>
+                    {managementPlan && managementPlan.length > 0 && (
+                      <button className="w-full mt-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-lg">
+                        Export Health Strategy
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -173,6 +296,44 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           )}
         </div>
       </div>
+
+      {/* Add Field Modal */}
+      {showAddFieldModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-300">
+            <h2 className="text-3xl font-black mb-8 text-slate-900">Deploy New Node</h2>
+            <form onSubmit={handleAddField} className="space-y-6">
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Field Descriptor</label>
+                <input required type="text" value={newFieldData.name} onChange={e => setNewFieldData({...newFieldData, name: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="e.g. North Paddy A" />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Geographic Location</label>
+                <input required type="text" value={newFieldData.location} onChange={e => setNewFieldData({...newFieldData, location: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="e.g. Bogura, Bangladesh" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Size (ha)</label>
+                  <input required type="number" step="0.1" value={newFieldData.size} onChange={e => setNewFieldData({...newFieldData, size: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="1.2" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Soil Type</label>
+                  <select value={newFieldData.soilType} onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-black">
+                    <option value="Loamy">Loamy</option>
+                    <option value="Clay">Clay</option>
+                    <option value="Sandy">Sandy</option>
+                    <option value="Alluvial">Alluvial</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-4 pt-6">
+                <button type="button" onClick={() => setShowAddFieldModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all">Deploy</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
