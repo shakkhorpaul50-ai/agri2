@@ -30,12 +30,17 @@ const formatDataForPrompt = (data: any) => {
   `;
 };
 
+export interface SoilInsight {
+  summary: string;
+  soil_fertilizer: string;
+}
+
 export const getCropAnalysis = async (field: Field, latestData: any) => {
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `You are an expert agronomist. Based on the provided NPK and pH data, suggest 3 specific crops or vegetables that will have a GREAT HARVEST in these conditions. For each, suggest the EXACT PERFECT FERTILIZER strategy (e.g. Urea, TSP, MOP, Gypsum, or specific Organic Compost) required to optimize growth for that specific plant in this soil. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `You are a world-class agronomist. Based on the NPK, pH, and Moisture data, suggest 3 specific vegetables or crops that will result in a GREAT HARVEST. For each, specify the EXACT PERFECT FERTILIZER required to maximize that specific crop's yield in this specific soil. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -43,12 +48,12 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
           items: {
             type: Type.OBJECT,
             properties: {
-              name: { type: Type.STRING, description: "Name of the crop or vegetable" },
-              suitability: { type: Type.NUMBER, description: "Match percentage (0-100)" },
-              yield: { type: Type.STRING, description: "Estimated harvest potential" },
-              requirements: { type: Type.STRING, description: "Key growing conditions needed" },
-              fertilizer: { type: Type.STRING, description: "Specific fertilizer recommendation for this crop given the current soil deficit" },
-              icon: { type: Type.STRING, description: "FontAwesome icon name (e.g. fa-carrot, fa-seedling)" }
+              name: { type: Type.STRING },
+              suitability: { type: Type.NUMBER },
+              yield: { type: Type.STRING },
+              requirements: { type: Type.STRING },
+              fertilizer: { type: Type.STRING },
+              icon: { type: Type.STRING }
             },
             required: ["name", "suitability", "yield", "requirements", "fertilizer", "icon"]
           }
@@ -65,17 +70,34 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
   }
 };
 
-export const getSoilHealthSummary = async (field: Field, latestData: any) => {
+export const getSoilHealthSummary = async (field: Field, latestData: any): Promise<SoilInsight> => {
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Provide a 3-sentence expert summary on HOW TO IMPROVE THE HEALTH of this specific field's soil. Focus on pH restoration, organic matter replenishment, and nutrient balancing. Be scientifically specific. ${formatDataForPrompt({...latestData, ...field})}`
+      contents: `Analyze the soil health of "${field.field_name}". Provide a detailed summary of how to improve its health. Specifically, suggest what type of fertilizer or soil conditioner (like Lime, Gypsum, or specialized NPK boosters) is perfect for restoring this SPECIFIC soil type to its optimal state. ${formatDataForPrompt({...latestData, ...field})}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING, description: "Detailed 3-sentence restoration strategy" },
+            soil_fertilizer: { type: Type.STRING, description: "The specific fertilizer/conditioner needed for the soil itself" }
+          },
+          required: ["summary", "soil_fertilizer"]
+        }
+      }
     });
-    return response.text || "Diagnostic complete. Monitor NPK levels closely.";
+    
+    const text = response.text;
+    if (!text) throw new Error("Empty AI response");
+    return JSON.parse(text);
   } catch (error: any) {
     console.error("Soil summary failed", error);
-    return "Soil health is currently stable. Recommend adding vermicompost to improve microbial activity and moisture retention.";
+    return {
+      summary: "Soil health is currently stable but requires organic matter to increase microbial activity.",
+      soil_fertilizer: "Apply Vermicompost (5kg/sqm) and check pH balance."
+    };
   }
 };
 
@@ -84,7 +106,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Create a prioritized 4-step SOIL IMPROVEMENT AND HARVEST ROADMAP for "${field.field_name}". Steps MUST include specific actions to improve soil quality (like liming for acidity, adding potash for strength) and timing for the recommended harvest. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Create a prioritized 4-step roadmap for soil restoration and harvest success. Include scientific steps for fixing the soil and preparing for high-yield planting. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -92,10 +114,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
           items: {
             type: Type.OBJECT,
             properties: {
-              priority: { type: Type.STRING, description: "High, Medium, or Low" },
-              title: { type: Type.STRING, description: "Short title of the improvement task" },
-              description: { type: Type.STRING, description: "Detailed instruction on how to perform the soil restoration" },
-              icon: { type: Type.STRING, description: "FontAwesome icon name" }
+              priority: { type: Type.STRING },
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              icon: { type: Type.STRING }
             },
             required: ["priority", "title", "description", "icon"]
           }
