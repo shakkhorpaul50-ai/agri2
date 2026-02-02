@@ -1,6 +1,7 @@
-import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, Auth } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, Firestore } from 'firebase/firestore';
+
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, orderBy, limit, addDoc } from 'firebase/firestore';
 import { User, Field, Sensor } from '../types';
 
 // Configuration for project: agricare-4c725
@@ -13,30 +14,15 @@ const firebaseConfig = {
   appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
 };
 
-// Singleton pattern to ensure Firebase is initialized before services are called
-let appInstance: FirebaseApp;
-let authInstance: Auth;
-let dbInstance: Firestore;
+// Initialize app immediately to register services
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-const getAgricareApp = () => {
-  if (!appInstance) {
-    appInstance = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  }
-  return appInstance;
-};
-
-const getAgricareAuth = () => {
-  if (!authInstance) {
-    authInstance = getAuth(getAgricareApp());
-  }
-  return authInstance;
-};
-
+// Access services safely. We use functions to ensure they are accessed only after the module is fully loaded.
+const getAgricareAuth = () => getAuth(app);
 const getAgricareDb = () => {
-  if (!dbInstance) {
-    dbInstance = getFirestore(getAgricareApp());
-  }
-  return dbInstance;
+  const db = getFirestore(app);
+  if (!db) throw new Error("Firestore service not initialized");
+  return db;
 };
 
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
@@ -82,8 +68,8 @@ export const registerUser = async (user: User, pass: string): Promise<User> => {
 };
 
 export const syncFields = async (userId: string): Promise<Field[]> => {
-  const db = getAgricareDb();
   try {
+    const db = getAgricareDb();
     const q = query(collection(db, 'fields'), where('user_id', '==', userId));
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as Field);
@@ -94,8 +80,8 @@ export const syncFields = async (userId: string): Promise<Field[]> => {
 };
 
 export const addFieldToDb = async (field: Field): Promise<void> => {
-  const db = getAgricareDb();
   try {
+    const db = getAgricareDb();
     await setDoc(doc(db, 'fields', field.field_id.toString()), field);
   } catch (e) {
     console.error("Add Field Error:", e);
@@ -103,11 +89,10 @@ export const addFieldToDb = async (field: Field): Promise<void> => {
 };
 
 export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> => {
-  const db = getAgricareDb();
   if (userFields.length === 0) return [];
   try {
+    const db = getAgricareDb();
     const userFieldIds = userFields.map(f => f.field_id);
-    // Firestore 'in' queries limited to 10 items
     const chunks = [];
     for (let i = 0; i < userFieldIds.length; i += 10) {
       chunks.push(userFieldIds.slice(i, i + 10));
@@ -127,8 +112,8 @@ export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> 
 };
 
 export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
-  const db = getAgricareDb();
   try {
+    const db = getAgricareDb();
     await setDoc(doc(db, 'sensors', sensor.sensor_id.toString()), sensor);
   } catch (e) {
     console.error("Update Sensor Error:", e);
@@ -136,20 +121,52 @@ export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
 };
 
 export const deleteSensorFromDb = async (id: number): Promise<void> => {
-  const db = getAgricareDb();
   try {
+    const db = getAgricareDb();
     await deleteDoc(doc(db, 'sensors', id.toString()));
   } catch (e) {
     console.error("Delete Sensor Error:", e);
   }
 };
 
+// --- Review Persistence ---
+export interface Review {
+  id?: string;
+  name: string;
+  rating: number;
+  text: string;
+  date: string;
+  createdAt: number;
+}
+
+export const getReviews = async (): Promise<Review[]> => {
+  try {
+    const db = getAgricareDb();
+    const q = query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(10));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Review));
+  } catch (e) {
+    console.error("Get Reviews Error:", e);
+    return [];
+  }
+};
+
+export const saveReview = async (review: Omit<Review, 'id'>): Promise<void> => {
+  try {
+    const db = getAgricareDb();
+    await addDoc(collection(db, 'reviews'), review);
+  } catch (e) {
+    console.error("Save Review Error:", e);
+    throw e;
+  }
+};
+
 export const DbService = {
   getFields: syncFields,
   getSensors: async (fieldIds: number[]) => {
-    const db = getAgricareDb();
     if (fieldIds.length === 0) return [];
     try {
+      const db = getAgricareDb();
       const q = query(collection(db, 'sensors'), where('field_id', 'in', fieldIds));
       const snap = await getDocs(q);
       return snap.docs.map(d => d.data() as Sensor);
@@ -157,5 +174,7 @@ export const DbService = {
       console.error("DbService getSensors error:", e);
       return [];
     }
-  }
+  },
+  getReviews,
+  saveReview
 };
