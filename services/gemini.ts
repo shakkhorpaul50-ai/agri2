@@ -2,10 +2,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Field, CropRecommendation } from "../types";
 
-// Initialize the Google GenAI client following strict guidelines
+// Initialize the Google GenAI client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Using gemini-3-pro-preview for complex reasoning tasks
+// Using gemini-3-pro-preview for advanced agricultural reasoning
 const MODEL_NAME = 'gemini-3-pro-preview';
 
 export interface SoilInsight {
@@ -13,7 +13,6 @@ export interface SoilInsight {
   soil_fertilizer: string;
 }
 
-// Added missing interface for management prescriptions
 export interface ManagementPrescription {
   irrigation: {
     needed: boolean;
@@ -30,25 +29,38 @@ export interface ManagementPrescription {
   };
 }
 
-const formatDataForPrompt = (data: any) => {
-  const format = (key: string, label: string, unit: string = '') => {
-    const val = data[key];
-    if (val === undefined || val === null) return `${label}: [MISSING]`;
-    return `${label}: ${Number(val).toFixed(2)}${unit}`;
-  };
+/**
+ * Safely parses JSON from AI response, handling markdown blocks and potential errors.
+ */
+const safeParse = (text: string | undefined, fallback: any) => {
+  if (!text) return fallback;
+  try {
+    const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(clean);
+  } catch (e) {
+    console.warn("AI Response parsing failed, using fallback.", e);
+    return fallback;
+  }
+};
 
-  const npkStatus = (data.npk_n !== undefined) 
-    ? `Nitrogen=${data.npk_n}, Phosphorus=${data.npk_p}, Potassium=${data.npk_k}` 
-    : "[MISSING]";
+const formatDataForPrompt = (data: any) => {
+  const getVal = (v: any, unit: string = '') => (v !== undefined && v !== null) ? `${Number(v).toFixed(2)}${unit}` : "[NOT_REGISTERED]";
+  
+  const npk = (data.npk_n !== undefined) 
+    ? `N:${data.npk_n}, P:${data.npk_p}, K:${data.npk_k}` 
+    : "[NOT_REGISTERED]";
 
   return `
-    [ACTUAL SENSOR TELEMETRY FROM FIELD]
-    - MOISTURE: ${format('moisture', 'Current', '%')}
-    - pH LEVEL: ${format('ph_level', 'Current')}
-    - NPK PROFILE: ${npkStatus}
-    - TEMPERATURE: ${format('temperature', 'Current', '°C')}
+    [LIVE SENSOR FEED]
+    - MOISTURE: ${getVal(data.moisture, '%')}
+    - pH LEVEL: ${getVal(data.ph_level)}
+    - NPK PROFILE: ${npk}
+    - TEMPERATURE: ${getVal(data.temperature, '°C')}
     
-    FIELD CONTEXT: ${data.field_name}, ${data.location}, Soil: ${data.soil_type || 'Loamy'}.
+    [FIELD METADATA]
+    - Name: ${data.field_name}
+    - Soil: ${data.soil_type || 'Loamy'}
+    - District: ${data.location}
   `;
 };
 
@@ -56,14 +68,14 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `You are an Adaptive Agricultural Data Analyst. 
-      TASK: Suggest 3 crops using a 'Partial Correlation' approach based on whatever sensors are available.
+      contents: `ACT AS: Senior Agronomist. 
+      TASK: Recommend 3 crops based on the provided [LIVE SENSOR FEED].
       
-      RULES:
-      1. If even ONE sensor (e.g., only pH or only Moisture) is provided, you MUST provide a recommendation. 
-      2. If data is partial, the 'suitability' should reflect the match against the KNOWN metrics, but the 'requirements' field must state: "Partial analysis based only on [Available Sensors]".
-      3. If ALL sensors are [MISSING], return suitability 0% and name the crop "Sensor Hardware Required".
-      4. Weight your logic: If pH is 5.5, suggest acid-loving crops (like Potatoes or Tea) even if NPK is missing.
+      CORE LOGIC:
+      1. If even ONE sensor (e.g., just pH) is active, you MUST correlate it with the District's typical climate and recommend crops.
+      2. If data is partial, set 'suitability' based on the match to active sensors.
+      3. In 'requirements', explicitly state: "Analysis based on [List Active Sensors]".
+      4. If NO sensors are active, suitability must be 0, name crop "Sensor Activation Required".
       
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
@@ -85,9 +97,9 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
         }
       }
     });
-    return JSON.parse(response.text || "[]");
+    return safeParse(response.text, []);
   } catch (error) {
-    console.error("Crop analysis failed:", error);
+    console.error("AI Node Failure:", error);
     return [];
   }
 };
@@ -96,8 +108,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Perform a 'Single-Factor' or 'Multi-Factor' soil health summary based on provided data.
-      If only one metric exists, analyze the implications of that specific metric for the soil.
+      contents: `Summarize soil health markers. Use whatever telemetry is present. If only one sensor exists, focus 100% on the implications of that one reading.
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
@@ -111,10 +122,9 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
         }
       }
     });
-    return JSON.parse(response.text || '{"summary": "No data available.", "soil_fertilizer": "Register sensors."}');
+    return safeParse(response.text, { summary: "Awaiting sensor handshake...", soil_fertilizer: "Telemetric verification required." });
   } catch (error) {
-    console.error("Soil health summary failed:", error);
-    return { summary: "Analysis node offline.", soil_fertilizer: "Check connectivity." };
+    return { summary: "Analysis node connectivity error.", soil_fertilizer: "Check hardware bridge." };
   }
 };
 
@@ -122,7 +132,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Create a prioritized action plan. If telemetry is partial, prioritize installing the missing sensors while offering advice on the metrics that ARE present.
+      contents: `Generate a prioritized management roadmap. If sensors are missing, the #1 task should be 'Deploy [Missing Sensor Name]'. 
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
@@ -141,9 +151,8 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
         }
       }
     });
-    return JSON.parse(response.text || "[]");
+    return safeParse(response.text, []);
   } catch (error) {
-    console.error("Management plan failed:", error);
     return [];
   }
 };
@@ -152,7 +161,7 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Generate prescriptions. If a specific sensor (e.g. NPK) is missing, return 'needed: false' for that category but explain why in the advice.
+      contents: `Provide direct irrigation and nutrient prescriptions. If data for a pillar (like NPK) is missing, set 'needed: false' and explain why in advice.
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
@@ -192,9 +201,8 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
         }
       }
     });
-    return JSON.parse(response.text || "null");
+    return safeParse(response.text, null);
   } catch (error) {
-    console.error("Management prescriptions failed:", error);
     return null;
   }
 };
