@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, Field } from '../../types';
 import { syncFields, addFieldToDb } from '../../services/db';
@@ -127,7 +126,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
 
       {/* Community Section (Feedback) - Only visible after login */}
       <div className="pt-8 border-t border-slate-100">
-        <CommentSection user={user} />
+        <CommentSection />
       </div>
 
       {/* Add Field Modal */}

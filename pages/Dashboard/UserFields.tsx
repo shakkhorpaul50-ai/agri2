@@ -189,7 +189,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
                   <h3 className="text-2xl font-black text-slate-800">Processing Registered Telemetry...</h3>
-                  <p className="text-slate-400 mt-2">Gemini 3 Flash is analyzing your specific field pillars.</p>
+                  <p className="text-slate-400 mt-2">Gemini 2.5 Flash is analyzing your specific field pillars.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -255,7 +255,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                           </div>
                         )) : (
                           <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
-                             <p className="font-bold text-sm">Generating AI recommendations based on soil profile...</p>
+                             <p>Awaiting harvest correlation data...</p>
                           </div>
                         )}
                       </div>

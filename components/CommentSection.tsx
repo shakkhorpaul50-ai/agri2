@@ -1,17 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { DbService, Review } from '../services/db';
-import { User } from '../types';
 
-interface CommentSectionProps {
-  user?: User;
-}
-
-const CommentSection: React.FC<CommentSectionProps> = ({ user }) => {
+const CommentSection: React.FC = () => {
   const [comments, setComments] = useState<Review[]>([]);
   const [newComment, setNewComment] = useState("");
   const [rating, setRating] = useState(5);
-  const [userName, setUserName] = useState(user?.name || "");
+  const [userName, setUserName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -28,11 +22,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ user }) => {
     };
     fetchReviews();
   }, []);
-
-  // Update name if user prop changes
-  useEffect(() => {
-    if (user?.name) setUserName(user.name);
-  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,10 +46,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ user }) => {
       
       // Reset form
       setNewComment("");
+      setUserName("");
       setRating(5);
     } catch (err: any) {
       console.error("Review Submission Error Detail:", err);
-      alert(`Permission Error: Please ensure you have updated your Firebase Firestore Rules as instructed in the console.`);
+      alert(`Failed to submit review: ${err.message || 'Unknown error'}. Please check if Firestore is configured with open rules or authenticated access.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -71,22 +61,22 @@ const CommentSection: React.FC<CommentSectionProps> = ({ user }) => {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">Farmer Community Feedback</h2>
-          <p className="text-slate-500">Only registered Agricare users can contribute to this section.</p>
+          <p className="text-slate-500">Share your experience with the Agricare platform.</p>
         </div>
 
-        {/* Form */}
+        {/* Form Styled to Match User Screenshot */}
         <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-10 mb-16">
           <h3 className="text-2xl font-bold mb-8 text-slate-900">Leave a Review</h3>
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div>
-                <label className="block text-sm font-bold text-slate-800 mb-3">Posting as</label>
+                <label className="block text-sm font-bold text-slate-800 mb-3">Your Name</label>
                 <input 
                   type="text" 
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   className="w-full px-5 py-4 rounded-xl bg-[#3f3f3f] text-slate-200 border-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500 font-medium" 
-                  placeholder="Your Name"
+                  placeholder="e.g. Kamal Hossain"
                   required
                 />
               </div>

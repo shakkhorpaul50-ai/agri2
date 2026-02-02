@@ -81,15 +81,15 @@ const formatDataForPrompt = (data: any) => {
   };
 
   const npkStatus = (data.npk_n !== undefined) 
-    ? `Nitrogen=${data.npk_n}ppm, Phosphorus=${data.npk_p}ppm, Potassium=${data.npk_k}ppm` 
+    ? `Nitrogen=${data.npk_n}, Phosphorus=${data.npk_p}, Potassium=${data.npk_k}` 
     : "[MISSING - NPK ANALYZER NOT REGISTERED]";
 
   return `
     [INSTALLED SENSOR PILLARS]
-    1. MOISTURE: ${format('moisture', 'Current Soil Moisture', '%')}
-    2. pH LEVEL: ${format('ph_level', 'Current Soil pH')}
+    1. MOISTURE: ${format('moisture', 'Current Reading', '%')}
+    2. pH LEVEL: ${format('ph_level', 'Current Reading')}
     3. NPK PROFILE: ${npkStatus}
-    4. TEMPERATURE: ${format('temperature', 'Current Soil Temperature', '°C')}
+    4. TEMPERATURE: ${format('temperature', 'Current Reading', '°C')}
     
     FIELD CONTEXT: ${data.field_name} at ${data.location}, Soil Type: ${data.soil_type || 'Loamy'}.
     
@@ -97,7 +97,7 @@ const formatDataForPrompt = (data: any) => {
   `;
 };
 
-const MODEL_NAME = 'gemini-3-flash-preview';
+const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
 
 export interface SoilInsight {
   summary: string;
@@ -121,10 +121,8 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Generate a 'Harvest Compatibility Index' recommending exactly 3 suitable crops based on this telemetry: ${formatDataForPrompt({...latestData, ...field})}. 
-      Rank them by suitability percentage (0-100). For each crop, explain why it's compatible with the current moisture and nutrient levels. Use relevant FontAwesome icons (e.g., fa-wheat-awn, fa-seedling, fa-leaf).`,
+      contents: `Suggest 3 crops based ONLY on available telemetry. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        systemInstruction: "You are an expert agronomist specialized in Bangladeshi agriculture and precision IoT farming. Your goal is to provide data-driven crop recommendations based on soil telemetry.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -145,7 +143,6 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
     });
     return cleanAndParseJSON(response.text) || getFallbackCrops(latestData);
   } catch (error) {
-    console.error("Gemini AI Analysis Error:", error);
     return getFallbackCrops(latestData);
   }
 };
@@ -154,9 +151,8 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Provide a Soil Restoration Strategy focusing on measured pillars: ${formatDataForPrompt({...latestData, ...field})}. Focus on restoring optimal ranges.`,
+      contents: `Provide Soil Restoration Strategy for these specific pillars. Ignore missing sensors. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        systemInstruction: "You are a soil scientist analyzing precision sensor data.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -178,9 +174,8 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Create precise irrigation and nutrient prescriptions for these registered sensors only: ${formatDataForPrompt({...latestData, ...field})}.`,
+      contents: `Create management prescriptions for these registered sensors only. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        systemInstruction: "You are an automated farm manager controller.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -228,9 +223,8 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Build a 4-step Operational Roadmap based ONLY on these detected sensors: ${formatDataForPrompt({...latestData, ...field})}.`,
+      contents: `Build a 4-step Operational Roadmap based ONLY on these detected sensors. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        systemInstruction: "You are a task-oriented agricultural consultant.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
