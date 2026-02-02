@@ -20,17 +20,13 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      try {
-        const dbFields = await syncFields(user.id);
-        setUserFields(dbFields);
-        
-        if (dbFields.length > 0) {
-          setNewSensorForm(prev => ({ ...prev, fieldId: dbFields[0].field_id.toString() }));
-          const dbSensors = await syncSensorsFromDb(dbFields);
-          setSensors(dbSensors);
-        }
-      } catch (err) {
-        console.error("Failed to load sensors:", err);
+      const dbFields = await syncFields(user.id);
+      setUserFields(dbFields);
+      
+      if (dbFields.length > 0) {
+        setNewSensorForm(prev => ({ ...prev, fieldId: dbFields[0].field_id.toString() }));
+        const dbSensors = await syncSensorsFromDb(dbFields);
+        setSensors(dbSensors);
       }
       setLoading(false);
     };
@@ -47,36 +43,21 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
       last_active: new Date().toISOString()
     };
 
-    try {
-      await addOrUpdateSensorInDb(updatedSensor);
-      setSensors(prev => prev.map(s => s.sensor_id === updatedSensor.sensor_id ? updatedSensor : s));
-      setShowUpdateModal(null);
-      setReadingInput({});
-      alert("Sensor telemetry updated.");
-    } catch (err) {
-      alert("Failed to update sensor. Verification failed.");
-      console.error(err);
-    }
+    await addOrUpdateSensorInDb(updatedSensor);
+    setSensors(sensors.map(s => s.sensor_id === updatedSensor.sensor_id ? updatedSensor : s));
+    setShowUpdateModal(null);
+    setReadingInput({});
   };
 
   const handleDeleteSensor = async (id: number) => {
-    if (window.confirm("Remove this sensor from the plot?")) {
-      try {
-        await deleteSensorFromDb(id);
-        setSensors(prev => prev.filter(s => s.sensor_id !== id));
-      } catch (err) {
-        alert("Delete failed. Device still registered in cloud.");
-      }
+    if (window.confirm("Remove this sensor?")) {
+      await deleteSensorFromDb(id);
+      setSensors(sensors.filter(s => s.sensor_id !== id));
     }
   };
 
   const handleAddSensor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSensorForm.fieldId) {
-      alert("Please assign the sensor to a plot.");
-      return;
-    }
-
     const newSensor: Sensor = {
       sensor_id: Math.floor(1000 + Math.random() * 9000),
       field_id: parseInt(newSensorForm.fieldId),
@@ -85,15 +66,9 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
       status: 'active',
       last_active: new Date().toISOString()
     };
-
-    try {
-      await addOrUpdateSensorInDb(newSensor);
-      setSensors(prev => [newSensor, ...prev]);
-      setShowAddModal(false);
-      alert("Sensor paired successfully.");
-    } catch (err) {
-      alert("Pairing failed. Database rejected the write.");
-    }
+    await addOrUpdateSensorInDb(newSensor);
+    setSensors([newSensor, ...sensors]);
+    setShowAddModal(false);
   };
 
   return (
@@ -165,6 +140,7 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
         </div>
       )}
 
+      {/* Add Sensor Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-200">
@@ -182,7 +158,6 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Assigned Plot</label>
                 <select className="w-full px-5 py-4 rounded-2xl border-none bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-emerald-500" value={newSensorForm.fieldId} onChange={e => setNewSensorForm({...newSensorForm, fieldId: e.target.value})}>
-                  <option value="">Select a field</option>
                   {userFields.map(f => (
                     <option key={f.field_id} value={f.field_id}>{f.field_name}</option>
                   ))}
@@ -197,6 +172,7 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
         </div>
       )}
 
+      {/* Update Reading Modal */}
       {showUpdateModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl">
