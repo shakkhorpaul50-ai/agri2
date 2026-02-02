@@ -33,13 +33,13 @@ export interface ManagementPrescription {
 const formatDataForPrompt = (data: any) => {
   const format = (key: string, label: string, unit: string = '') => {
     const val = data[key];
-    if (val === undefined || val === null) return `${label}: [MISSING - NO SENSOR REGISTERED]`;
+    if (val === undefined || val === null) return `${label}: [MISSING]`;
     return `${label}: ${Number(val).toFixed(2)}${unit}`;
   };
 
   const npkStatus = (data.npk_n !== undefined) 
     ? `Nitrogen=${data.npk_n}, Phosphorus=${data.npk_p}, Potassium=${data.npk_k}` 
-    : "[MISSING - NO NPK ANALYZER REGISTERED]";
+    : "[MISSING]";
 
   return `
     [ACTUAL SENSOR TELEMETRY FROM FIELD]
@@ -56,13 +56,14 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `You are a strict Agricultural Data Analyst. 
-      TASK: Suggest 3 crops based EXCLUSIVELY on the sensor telemetry provided.
+      contents: `You are an Adaptive Agricultural Data Analyst. 
+      TASK: Suggest 3 crops using a 'Partial Correlation' approach based on whatever sensors are available.
       
       RULES:
-      1. If a sensor is [MISSING], you MUST explain in the 'requirements' field that the recommendation is low-confidence due to missing hardware.
-      2. If ALL sensors are [MISSING], return suitability scores of 0% and name the crop "Hardware Registration Required".
-      3. Suitability MUST be calculated based on how well the CURRENT pH, moisture, and NPK values match the crop needs.
+      1. If even ONE sensor (e.g., only pH or only Moisture) is provided, you MUST provide a recommendation. 
+      2. If data is partial, the 'suitability' should reflect the match against the KNOWN metrics, but the 'requirements' field must state: "Partial analysis based only on [Available Sensors]".
+      3. If ALL sensors are [MISSING], return suitability 0% and name the crop "Sensor Hardware Required".
+      4. Weight your logic: If pH is 5.5, suggest acid-loving crops (like Potatoes or Tea) even if NPK is missing.
       
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
@@ -84,7 +85,6 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
         }
       }
     });
-    // response.text is a property, not a method
     return JSON.parse(response.text || "[]");
   } catch (error) {
     console.error("Crop analysis failed:", error);
@@ -96,7 +96,8 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Analyze soil health based ONLY on provided telemetry. Do not hallucinate values.
+      contents: `Perform a 'Single-Factor' or 'Multi-Factor' soil health summary based on provided data.
+      If only one metric exists, analyze the implications of that specific metric for the soil.
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
@@ -121,7 +122,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Build an Operational Roadmap. If sensors are missing, the #1 priority must be 'Install Sensor'.
+      contents: `Create a prioritized action plan. If telemetry is partial, prioritize installing the missing sensors while offering advice on the metrics that ARE present.
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
@@ -151,7 +152,7 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Create precise management prescriptions based ONLY on detected sensor pillars.
+      contents: `Generate prescriptions. If a specific sensor (e.g. NPK) is missing, return 'needed: false' for that category but explain why in the advice.
       ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
