@@ -47,8 +47,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     
     try {
       const fieldSensors = await syncSensorsFromDb([field]);
-      
-      // Strict data state - only values from registered sensors will be present
       const stats: any = {};
       
       fieldSensors.forEach(s => {
@@ -96,6 +94,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setShowAddFieldModal(false);
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
+
+  const hasTelemetry = currentDataState && Object.keys(currentDataState).length > 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen">
@@ -160,20 +160,27 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       <h2 className="text-5xl font-black tracking-tight mb-2">{selectedField.field_name}</h2>
                       <p className="text-slate-400 text-lg font-medium">{selectedField.location} • {selectedField.size} ha</p>
                     </div>
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl flex items-center gap-2">
-                       <i className="fas fa-bolt text-emerald-400"></i>
-                       <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live AI Stream</span>
+                    <div className={`px-4 py-2 rounded-xl flex items-center gap-2 border ${hasTelemetry ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                       <i className={`fas ${hasTelemetry ? 'fa-bolt' : 'fa-triangle-exclamation'}`}></i>
+                       <span className="text-[10px] font-black uppercase tracking-widest">{hasTelemetry ? 'Live AI Stream' : 'Sensors Required'}</span>
                     </div>
                   </div>
 
+                  {!hasTelemetry && (
+                    <div className="mb-8 p-4 bg-red-500/20 border border-red-500/30 rounded-2xl text-red-100 text-sm font-bold flex items-center gap-3">
+                      <i className="fas fa-circle-info"></i>
+                      No active sensors detected for this plot. Analysis confidence is 0%.
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
-                      { label: 'Moisture', val: currentDataState?.moisture != null ? `${currentDataState.moisture.toFixed(1)}%` : 'Sensor Required', icon: 'fa-droplet', color: 'text-blue-400', active: currentDataState?.moisture != null },
-                      { label: 'pH Level', val: currentDataState?.ph_level != null ? currentDataState.ph_level.toFixed(1) : 'Sensor Required', icon: 'fa-scale-balanced', color: 'text-purple-400', active: currentDataState?.ph_level != null },
-                      { label: 'Temperature', val: currentDataState?.temperature != null ? `${currentDataState.temperature.toFixed(1)}°C` : 'Sensor Required', icon: 'fa-temperature-half', color: 'text-orange-400', active: currentDataState?.temperature != null },
-                      { label: 'NPK Balance', val: currentDataState?.npk_n != null ? 'Synced' : 'Sensor Required', icon: 'fa-vial', color: 'text-emerald-400', active: currentDataState?.npk_n != null }
+                      { label: 'Moisture', val: currentDataState?.moisture != null ? `${currentDataState.moisture.toFixed(1)}%` : 'Missing', icon: 'fa-droplet', color: 'text-blue-400', active: currentDataState?.moisture != null },
+                      { label: 'pH Level', val: currentDataState?.ph_level != null ? currentDataState.ph_level.toFixed(1) : 'Missing', icon: 'fa-scale-balanced', color: 'text-purple-400', active: currentDataState?.ph_level != null },
+                      { label: 'Temperature', val: currentDataState?.temperature != null ? `${currentDataState.temperature.toFixed(1)}°C` : 'Missing', icon: 'fa-temperature-half', color: 'text-orange-400', active: currentDataState?.temperature != null },
+                      { label: 'NPK Balance', val: currentDataState?.npk_n != null ? 'Synced' : 'Missing', icon: 'fa-vial', color: 'text-emerald-400', active: currentDataState?.npk_n != null }
                     ].map((p, i) => (
-                      <div key={i} className={`bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center gap-4 backdrop-blur-sm transition-opacity ${p.active ? 'opacity-100' : 'opacity-40'}`}>
+                      <div key={i} className={`bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center gap-4 backdrop-blur-sm transition-opacity ${p.active ? 'opacity-100' : 'opacity-30'}`}>
                         <i className={`fas ${p.icon} ${p.color} text-lg`}></i>
                         <div>
                           <div className="text-[8px] font-black uppercase text-slate-400 tracking-widest">{p.label}</div>
@@ -188,8 +195,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
-                  <h3 className="text-2xl font-black text-slate-800">Processing Registered Telemetry...</h3>
-                  <p className="text-slate-400 mt-2">Gemini 2.5 Flash is analyzing your specific field pillars.</p>
+                  <h3 className="text-2xl font-black text-slate-800">Analyzing Telemetry Pillars...</h3>
+                  <p className="text-slate-400 mt-2">Correlating current soil markers with genetic crop requirements.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -207,18 +214,18 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       <div className="space-y-6">
                         <div className="p-8 rounded-[2rem] bg-emerald-50/50 text-slate-700 border border-emerald-50">
                           <p className="text-lg leading-relaxed font-bold italic text-slate-800">
-                            "{soilInsight?.summary || "Analyzing sensor intersections..."}"
+                            "{soilInsight?.summary || (hasTelemetry ? "Analyzing sensor intersections..." : "Please install sensors to receive a biological restoration strategy.")}"
                           </p>
                         </div>
                         
-                        <div className="bg-slate-900 text-white p-6 rounded-[2.5rem] flex items-center justify-between shadow-2xl group-hover:bg-slate-800 transition-colors">
+                        <div className={`p-6 rounded-[2.5rem] flex items-center justify-between shadow-2xl transition-colors ${hasTelemetry ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400'}`}>
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center">
-                              <i className="fas fa-hand-holding-droplet text-white"></i>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${hasTelemetry ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                              <i className={`fas fa-hand-holding-droplet ${hasTelemetry ? 'text-white' : 'text-slate-400'}`}></i>
                             </div>
                             <div>
                               <div className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Recommended Treatment</div>
-                              <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || "Calculating..."}</div>
+                              <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || (hasTelemetry ? "Calculating..." : "Telemetry Missing")}</div>
                             </div>
                           </div>
                         </div>
@@ -232,20 +239,20 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {recommendations && recommendations.length > 0 ? recommendations.map((r, i) => (
-                          <div key={i} className="bg-white p-8 rounded-[3rem] border border-slate-100 hover:shadow-2xl transition-all hover:-translate-y-1">
+                          <div key={i} className={`p-8 rounded-[3rem] border transition-all hover:shadow-2xl hover:-translate-y-1 ${r.suitability > 0 ? 'bg-white border-slate-100' : 'bg-slate-50 border-dashed border-slate-200 grayscale opacity-60'}`}>
                             <div className="flex justify-between items-start mb-8">
-                              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center shadow-inner">
+                              <div className={`w-16 h-16 rounded-3xl flex items-center justify-center shadow-inner ${r.suitability > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
                                 <i className={`fas ${r.icon || 'fa-seedling'} text-2xl`}></i>
                               </div>
                               <div className="text-right">
                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Match</div>
-                                <div className="text-2xl font-black text-slate-900">{r.suitability}%</div>
+                                <div className={`text-2xl font-black ${r.suitability > 70 ? 'text-emerald-600' : 'text-slate-900'}`}>{r.suitability}%</div>
                               </div>
                             </div>
                             <h4 className="font-black text-slate-900 text-xl mb-4">{r.name}</h4>
                             <div className="space-y-4">
-                              <div className="bg-emerald-600 p-5 rounded-[1.5rem] shadow-lg shadow-emerald-100">
-                                <div className="text-[10px] font-black text-emerald-200 uppercase mb-2 flex items-center gap-2">
+                              <div className={`${r.suitability > 0 ? 'bg-emerald-600' : 'bg-slate-300'} p-5 rounded-[1.5rem] shadow-lg`}>
+                                <div className="text-[10px] font-black text-white/60 uppercase mb-2 flex items-center gap-2">
                                   <i className="fas fa-flask-vial"></i> Optimal Supplement
                                 </div>
                                 <p className="text-xs font-bold text-white leading-relaxed">{r.fertilizer}</p>
@@ -272,10 +279,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         managementPlan.map((p, i) => (
                           <div key={i} className="relative pl-8">
                             <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-full ${
-                              p.priority.toLowerCase().includes('crit') || p.priority.toLowerCase().includes('high') ? 'bg-red-500' : 'bg-emerald-500'
+                              p.priority.toLowerCase().includes('crit') || p.priority.toLowerCase().includes('high') || p.priority.toLowerCase().includes('urgent') ? 'bg-red-500' : 'bg-emerald-500'
                             }`}></div>
                             <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${
-                              p.priority.toLowerCase().includes('crit') || p.priority.toLowerCase().includes('high') ? 'text-red-500' : 'text-emerald-500'
+                              p.priority.toLowerCase().includes('crit') || p.priority.toLowerCase().includes('high') || p.priority.toLowerCase().includes('urgent') ? 'text-red-500' : 'text-emerald-500'
                             }`}>
                               {p.priority} Priority
                             </div>
@@ -286,7 +293,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       ) : (
                         <div className="text-center py-20 opacity-30">
                            <i className="fas fa-list-check text-4xl mb-4"></i>
-                           <p className="font-bold text-sm">Building roadmap...</p>
+                           <p className="font-bold text-sm">No tasks identified.</p>
                         </div>
                       )}
                     </div>
