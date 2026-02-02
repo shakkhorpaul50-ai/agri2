@@ -1,8 +1,7 @@
 {
   "requestFramePermissions": [
-    "geolocation",
-    "camera"
+    "geolocation"
   ],
   "name": "Agricare - Agricultural Monitoring System",
-  "description": "Smart AI-powered agricultural monitoring and diagnostic system for the Bangladesh Delta."
+  "description": ""
 }

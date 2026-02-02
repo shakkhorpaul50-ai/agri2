@@ -3,42 +3,65 @@ import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
+import PublicDashboard from './pages/PublicDashboard';
+import Pricing from './pages/Pricing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Overview from './pages/Dashboard/Overview';
 import Sensors from './pages/Dashboard/Sensors';
 import Management from './pages/Dashboard/Management';
-import IntelligenceHub from './pages/Dashboard/IntelligenceHub';
-import Vision from './pages/Dashboard/Vision';
-import HowItWorks from './pages/HowItWorks';
-import PublicDashboard from './pages/PublicDashboard';
-import Pricing from './pages/Pricing';
+import UserFields from './pages/Dashboard/UserFields';
 import FeaturesPublic from './pages/FeaturesPublic';
+import HowItWorks from './pages/HowItWorks';
 
 import { User } from './types';
 
 const App: React.FC = () => {
+  // Initialize state from localStorage to persist session
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('agricare_session');
-    return saved ? JSON.parse(saved) : null;
+    const savedUser = localStorage.getItem('agricare_session');
+    return savedUser ? JSON.parse(savedUser) : null;
   });
   
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('agricare_session') !== null);
-  const [activeTab, setActiveTab] = useState(() => {
-    const h = window.location.hash.replace('#', '');
-    return h || (localStorage.getItem('agricare_session') ? 'dashboard' : 'home');
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('agricare_session') !== null;
   });
 
-  useEffect(() => {
-    const handleHash = () => {
-      const h = window.location.hash.replace('#', '');
-      setActiveTab(h || (isLoggedIn ? 'dashboard' : 'home'));
-    };
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
-  }, [isLoggedIn]);
+  const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) return hash;
+    // If logged in, default to dashboard, otherwise home
+    return localStorage.getItem('agricare_session') ? 'dashboard' : 'home';
+  });
 
-  const navigateTo = (tab: string) => { window.location.hash = tab; };
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash) {
+        setActiveTab(hash);
+      } else {
+        const defaultTab = isLoggedIn ? 'dashboard' : 'home';
+        setActiveTab(defaultTab);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    // Sync initial state with hash if present
+    if (window.location.hash) {
+      handleHashChange();
+    } else {
+      // Set initial hash if empty
+      window.location.hash = activeTab;
+    }
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [isLoggedIn, activeTab]);
+
+  // Wrapper for navigation to update hash
+  const navigateTo = (tab: string) => {
+    window.location.hash = tab;
+  };
 
   const handleLogin = (user: User) => {
     localStorage.setItem('agricare_session', JSON.stringify(user));
@@ -55,33 +78,38 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    const auth = (comp: React.ReactNode) => isLoggedIn ? comp : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
-
     switch (activeTab) {
       case 'home': return <Home onGetStarted={() => navigateTo('signup')} />;
+      case 'features-public': return <FeaturesPublic onNavigate={navigateTo} />;
+      case 'how-it-works': return <HowItWorks />;
+      case 'public-dashboard': return <PublicDashboard />;
+      case 'pricing': return <Pricing />;
       case 'login': return <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
       case 'signup': return <Signup onSignup={handleLogin} onSwitchToLogin={() => navigateTo('login')} />;
-      case 'how-it-works': return <HowItWorks />;
-      case 'pricing': return <Pricing />;
-      case 'features': return <FeaturesPublic onNavigate={navigateTo} />;
-      case 'public-demo': return <PublicDashboard />;
       
-      case 'dashboard': return auth(<Overview user={currentUser!} />);
-      case 'intelligence': return auth(<IntelligenceHub user={currentUser!} />);
-      case 'vision': return auth(<Vision user={currentUser!} />);
-      case 'management': return auth(<Management user={currentUser!} />);
-      case 'sensors': return auth(<Sensors user={currentUser!} />);
+      // Auth Protected
+      case 'dashboard': return isLoggedIn ? <Overview user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
+      case 'fields': return isLoggedIn ? <UserFields user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
+      case 'management': return isLoggedIn ? <Management user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
+      case 'sensors': return isLoggedIn ? <Sensors user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
       
       default: return <Home onGetStarted={() => navigateTo('signup')} />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col selection:bg-emerald-100 selection:text-emerald-900">
-      <Navbar activeTab={activeTab} setActiveTab={navigateTo} isLoggedIn={isLoggedIn} onLogout={handleLogout} />
-      <main className="flex-grow animate-in fade-in duration-500">
+    <div className="min-h-screen flex flex-col">
+      <Navbar 
+        activeTab={activeTab} 
+        setActiveTab={navigateTo} 
+        isLoggedIn={isLoggedIn} 
+        onLogout={handleLogout} 
+      />
+      
+      <main className="flex-grow">
         {renderContent()}
       </main>
+
       <Footer onNavigate={navigateTo} />
     </div>
   );
