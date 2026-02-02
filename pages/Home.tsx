@@ -1,6 +1,4 @@
-
 import React, { useState, useEffect } from 'react';
-import CommentSection from '../components/CommentSection';
 
 interface HomeProps {
   onGetStarted: () => void;
@@ -178,9 +176,6 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
           ))}
         </div>
       </section>
-
-      {/* Comment Section */}
-      <CommentSection />
 
       {/* Install Modal (Fallback) */}
       {showInstallModal && (
