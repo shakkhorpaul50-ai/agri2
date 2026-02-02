@@ -30,34 +30,35 @@ const firebaseConfig = {
   appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
 };
 
-// ABSOLUTE IDENTITY CONSTANTS
-export const ADMIN_EMAIL = 'shakkhorpaul50@gmail.com';
-
+// Singleton instances
 let db: Firestore;
 let auth: Auth;
 
-const initializeFirebase = () => {
+const initializeAgricareFirebase = () => {
   try {
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     db = getFirestore(app);
     auth = getAuth(app);
-    console.log("Firebase/Firestore connected successfully");
+    console.log("Agricare: Firebase services initialized successfully.");
   } catch (err) {
-    console.error("Firebase initialization failed:", err);
+    console.error("Agricare: Firebase initialization failed:", err);
+    // Fallback to avoid null reference crashes if possible
   }
 };
 
-initializeFirebase();
+initializeAgricareFirebase();
 
 export const isDatabaseEnabled = () => !!db;
-export const isAdmin = (email: string) => email.toLowerCase().trim() === ADMIN_EMAIL;
 
 /**
  * Authentication via Google Popup
  */
 export const loginWithGoogle = async (): Promise<User | null> => {
-  if (!auth || !db) throw new Error("Database or Auth not initialized");
+  if (!auth || !db) throw new Error("Database or Auth service not available.");
+  
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  
   const result = await signInWithPopup(auth, provider);
   const user = result.user;
 
@@ -112,7 +113,6 @@ export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> 
   const userFieldIds = userFields.map(f => f.field_id);
   const allSensors: Sensor[] = [];
   try {
-    // Firestore "in" query limited to 10 items
     for (let i = 0; i < userFieldIds.length; i += 10) {
       const chunk = userFieldIds.slice(i, i + 10);
       const q = query(collection(db, 'sensors'), where('field_id', 'in', chunk));
@@ -136,7 +136,9 @@ export const deleteSensorFromDb = async (id: number): Promise<void> => {
   await deleteDoc(doc(db, 'sensors', String(id)));
 };
 
-// --- Review Persistence ---
+/**
+ * Review System
+ */
 export interface Review {
   id: string;
   name: string;
