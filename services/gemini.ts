@@ -2,9 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Field, CropRecommendation } from "../types";
 
-// Always initialize the AI with the required pattern
+// Initialize AI with Gemini 3 Flash
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const MODEL_NAME = 'gemini-3-flash-preview';
 
 export interface SoilInsight {
@@ -25,9 +24,6 @@ export interface ManagementPrescription {
   };
 }
 
-/**
- * Standard utility for safe JSON extraction from AI text responses.
- */
 const cleanAndParseJSON = (text: string | undefined) => {
   if (!text) return null;
   try {
@@ -38,43 +34,27 @@ const cleanAndParseJSON = (text: string | undefined) => {
   }
 };
 
-/**
- * Enhanced context builder that bridges hardware telemetry with AI agronomy.
- */
-const formatDataForPrompt = (data: any) => {
-  const getVal = (v: any, unit: string = '') => (v !== undefined && v !== null) ? `${Number(v).toFixed(2)}${unit}` : "[OFFLINE]";
-  
-  const npk = (data.npk_n !== undefined) 
-    ? `N:${data.npk_n}, P:${data.npk_p}, K:${data.npk_k}` 
-    : "[NPK ANALYZER OFFLINE]";
-
+const formatTelemetry = (data: any) => {
   return `
-    [LIVE FIELD TELEMETRY]
-    - MOISTURE: ${getVal(data.moisture, '%')}
-    - pH LEVEL: ${getVal(data.ph_level)}
-    - TEMPERATURE: ${getVal(data.temperature, '°C')}
-    - NPK PROFILE: ${npk}
-    
-    [FIELD CONTEXT]
-    - Plot Name: ${data.field_name}
-    - Location: ${data.location}
-    - Soil Base: ${data.soil_type || 'Loamy'}
+    [SENSOR DATA]
+    - Moisture: ${data.moisture ?? 'N/A'}%
+    - pH: ${data.ph_level ?? 'N/A'}
+    - Temp: ${data.temperature ?? 'N/A'}°C
+    - NPK: ${data.npk_n ?? 'N/A'}-${data.npk_p ?? 'N/A'}-${data.npk_k ?? 'N/A'} (ppm)
   `;
 };
 
+/**
+ * Calculates the "Harvest Compatibility Index" (suitability) via AI reasoning.
+ */
 export const getCropAnalysis = async (field: Field, latestData: any): Promise<CropRecommendation[]> => {
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `ACT AS: Senior Agronomy Data Scientist.
-      TASK: Generate a "Harvest Compatibility Index" (0-100%) for 3 potential crops based strictly on the provided [LIVE FIELD TELEMETRY].
-      
-      LOGIC:
-      1. Correlate moisture, pH, and NPK with crop biological thresholds.
-      2. Match the soil type and location climate.
-      3. Return a JSON array of 3 objects.
-      
-      ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `You are an expert agronomist in Bangladesh. 
+      Analyze this telemetry and generate a "Harvest Compatibility Index" (suitability score 0-100) for 3 crops.
+      ${formatTelemetry(latestData)}
+      Field Context: ${field.soil_type} soil in ${field.location}.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -96,7 +76,7 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
     });
     return cleanAndParseJSON(response.text) || [];
   } catch (error) {
-    console.error("AI Node Failure:", error);
+    console.error("AI Error:", error);
     return [];
   }
 };
@@ -105,8 +85,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Analyze soil health markers based on telemetry.
-      ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Provide a soil health summary and fertilizer advice based on: ${formatTelemetry(latestData)}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -119,9 +98,9 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
         }
       }
     });
-    return cleanAndParseJSON(response.text) || { summary: "Data stream interrupted.", soil_fertilizer: "Check hardware." };
+    return cleanAndParseJSON(response.text) || { summary: "Analysis unavailable.", soil_fertilizer: "Check sensors." };
   } catch (error) {
-    return { summary: "Analysis node offline.", soil_fertilizer: "Check connection." };
+    return { summary: "Offline.", soil_fertilizer: "N/A" };
   }
 };
 
@@ -129,8 +108,7 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Provide actionable prescriptions for irrigation and nutrients based on telemetry.
-      ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Prescribe irrigation and nutrients based on: ${formatTelemetry(latestData)}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -179,8 +157,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
-      contents: `Create a 4-step Operational Roadmap.
-      ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Create a 4-step action roadmap for this field: ${formatTelemetry(latestData)}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {

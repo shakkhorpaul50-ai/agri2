@@ -33,16 +33,21 @@ const firebaseConfig = {
 // ABSOLUTE IDENTITY CONSTANTS
 export const ADMIN_EMAIL = 'shakkhorpaul50@gmail.com';
 
-let db: Firestore | null = null;
-let auth: Auth | null = null;
+let db: Firestore;
+let auth: Auth;
 
-try {
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  db = getFirestore(app);
-  auth = getAuth(app);
-} catch (err) {
-  console.error("Firebase initialization failed:", err);
-}
+const initializeFirebase = () => {
+  try {
+    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app);
+    auth = getAuth(app);
+    console.log("Firebase/Firestore connected successfully");
+  } catch (err) {
+    console.error("Firebase initialization failed:", err);
+  }
+};
+
+initializeFirebase();
 
 export const isDatabaseEnabled = () => !!db;
 export const isAdmin = (email: string) => email.toLowerCase().trim() === ADMIN_EMAIL;
@@ -83,9 +88,8 @@ export const loginWithGoogle = async (): Promise<User | null> => {
 };
 
 /**
- * Agricare Specific Database Operations
+ * Agricare Data Operations
  */
-
 export const syncFields = async (userId: string): Promise<Field[]> => {
   if (!db) return [];
   try {
@@ -100,26 +104,17 @@ export const syncFields = async (userId: string): Promise<Field[]> => {
 
 export const addFieldToDb = async (field: Field): Promise<void> => {
   if (!db) throw new Error("Database offline");
-  try {
-    const docId = String(field.field_id);
-    await setDoc(doc(db, 'fields', docId), field);
-  } catch (e) {
-    console.error("Add Field Error:", e);
-    throw e;
-  }
+  await setDoc(doc(db, 'fields', String(field.field_id)), field);
 };
 
 export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> => {
   if (!db || userFields.length === 0) return [];
+  const userFieldIds = userFields.map(f => f.field_id);
+  const allSensors: Sensor[] = [];
   try {
-    const userFieldIds = userFields.map(f => f.field_id);
-    const chunks = [];
+    // Firestore "in" query limited to 10 items
     for (let i = 0; i < userFieldIds.length; i += 10) {
-      chunks.push(userFieldIds.slice(i, i + 10));
-    }
-
-    const allSensors: Sensor[] = [];
-    for (const chunk of chunks) {
+      const chunk = userFieldIds.slice(i, i + 10);
       const q = query(collection(db, 'sensors'), where('field_id', 'in', chunk));
       const snap = await getDocs(q);
       snap.forEach(d => allSensors.push(d.data() as Sensor));
@@ -133,24 +128,12 @@ export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> 
 
 export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
   if (!db) throw new Error("Database offline");
-  try {
-    const docId = String(sensor.sensor_id);
-    await setDoc(doc(db, 'sensors', docId), sensor);
-  } catch (e) {
-    console.error("Update Sensor Error:", e);
-    throw e;
-  }
+  await setDoc(doc(db, 'sensors', String(sensor.sensor_id)), sensor);
 };
 
 export const deleteSensorFromDb = async (id: number): Promise<void> => {
   if (!db) throw new Error("Database offline");
-  try {
-    const docId = String(id);
-    await deleteDoc(doc(db, 'sensors', docId));
-  } catch (e) {
-    console.error("Delete Sensor Error:", e);
-    throw e;
-  }
+  await deleteDoc(doc(db, 'sensors', String(id)));
 };
 
 // --- Review Persistence ---
@@ -171,33 +154,22 @@ export const getReviews = async (): Promise<Review[]> => {
     const reviews = snap.docs.map(d => d.data() as Review);
     return reviews.sort((a, b) => b.createdAt - a.createdAt);
   } catch (e) {
-    console.error("Get Reviews Error:", e);
     return [];
   }
 };
 
 export const saveReview = async (review: Review): Promise<void> => {
   if (!db) throw new Error("Database offline");
-  try {
-    await setDoc(doc(db, 'reviews', review.id), review, { merge: true });
-  } catch (e) {
-    console.error("Save Review Error:", e);
-    throw e;
-  }
+  await setDoc(doc(db, 'reviews', review.id), review, { merge: true });
 };
 
 export const DbService = {
   getFields: syncFields,
   getSensors: async (fieldIds: number[]) => {
     if (!db || fieldIds.length === 0) return [];
-    try {
-      const q = query(collection(db, 'sensors'), where('field_id', 'in', fieldIds));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => d.data() as Sensor);
-    } catch (e) {
-      console.error("DbService getSensors error:", e);
-      throw e;
-    }
+    const q = query(collection(db, 'sensors'), where('field_id', 'in', fieldIds));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as Sensor);
   },
   getReviews,
   saveReview
