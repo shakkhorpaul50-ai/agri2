@@ -1,3 +1,4 @@
+
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, limit } from 'firebase/firestore';
@@ -13,32 +14,12 @@ const firebaseConfig = {
   appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
 };
 
-// Initialize app safely
+// Initialize app safely as a singleton
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-// Access services with validation
-const getAgricareAuth = () => {
-  try {
-    return getAuth(app);
-  } catch (e) {
-    console.error("Firebase Auth initialization failed:", e);
-    throw e;
-  }
-};
-
-const getAgricareDb = () => {
-  try {
-    return getFirestore(app);
-  } catch (e) {
-    console.error("Firebase Firestore initialization failed:", e);
-    throw e;
-  }
-};
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
-  const auth = getAgricareAuth();
-  const db = getAgricareDb();
-  
   try {
     const cred = await signInWithEmailAndPassword(auth, email, pass);
     const userDocRef = doc(db, 'users', cred.user.uid);
@@ -57,22 +38,19 @@ export const loginUser = async (email: string, pass: string): Promise<User | nul
       await setDoc(userDocRef, fallbackUser);
       return fallbackUser;
     }
-  } catch (authError: any) {
-    console.error("Login Error:", authError);
-    throw authError;
+  } catch (e) {
+    console.error("Login Error:", e);
+    throw e;
   }
 };
 
 export const registerUser = async (user: User, pass: string): Promise<User> => {
-  const auth = getAgricareAuth();
-  const db = getAgricareDb();
-
   try {
     const cred = await createUserWithEmailAndPassword(auth, user.email, pass);
     const userData = { ...user, id: cred.user.uid };
     await setDoc(doc(db, 'users', cred.user.uid), userData);
     return userData;
-  } catch (e: any) {
+  } catch (e) {
     console.error("Registration Error:", e);
     throw e;
   }
@@ -80,29 +58,28 @@ export const registerUser = async (user: User, pass: string): Promise<User> => {
 
 export const syncFields = async (userId: string): Promise<Field[]> => {
   try {
-    const db = getAgricareDb();
     const q = query(collection(db, 'fields'), where('user_id', '==', userId));
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as Field);
   } catch (e) {
     console.error("Sync Fields Error:", e);
-    return [];
+    throw e;
   }
 };
 
 export const addFieldToDb = async (field: Field): Promise<void> => {
   try {
-    const db = getAgricareDb();
-    await setDoc(doc(db, 'fields', field.field_id.toString()), field);
+    // Ensure document ID is a string
+    await setDoc(doc(db, 'fields', String(field.field_id)), field);
   } catch (e) {
     console.error("Add Field Error:", e);
+    throw e;
   }
 };
 
 export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> => {
   if (userFields.length === 0) return [];
   try {
-    const db = getAgricareDb();
     const userFieldIds = userFields.map(f => f.field_id);
     const chunks = [];
     for (let i = 0; i < userFieldIds.length; i += 10) {
@@ -118,25 +95,25 @@ export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> 
     return allSensors;
   } catch (e) {
     console.error("Sync Sensors Error:", e);
-    return [];
+    throw e;
   }
 };
 
 export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
   try {
-    const db = getAgricareDb();
-    await setDoc(doc(db, 'sensors', sensor.sensor_id.toString()), sensor);
+    await setDoc(doc(db, 'sensors', String(sensor.sensor_id)), sensor);
   } catch (e) {
     console.error("Update Sensor Error:", e);
+    throw e;
   }
 };
 
 export const deleteSensorFromDb = async (id: number): Promise<void> => {
   try {
-    const db = getAgricareDb();
-    await deleteDoc(doc(db, 'sensors', id.toString()));
+    await deleteDoc(doc(db, 'sensors', String(id)));
   } catch (e) {
     console.error("Delete Sensor Error:", e);
+    throw e;
   }
 };
 
@@ -152,26 +129,21 @@ export interface Review {
 
 export const getReviews = async (): Promise<Review[]> => {
   try {
-    const db = getAgricareDb();
-    // Fetch limited set of reviews
     const q = query(collection(db, 'reviews'), limit(30));
     const snap = await getDocs(q);
     const reviews = snap.docs.map(d => d.data() as Review);
-    // Client-side sort to ensure consistent display without needing composite indexes immediately
     return reviews.sort((a, b) => b.createdAt - a.createdAt);
-  } catch (e: any) {
+  } catch (e) {
     console.error("Get Reviews Error:", e);
-    return [];
+    throw e;
   }
 };
 
 export const saveReview = async (review: Review): Promise<void> => {
   try {
-    const db = getAgricareDb();
-    // Saving with a specific ID (timestamp) to match the fields/users pattern
     await setDoc(doc(db, 'reviews', review.id), review);
-  } catch (e: any) {
-    console.error("Save Review Error (Verify Firebase Security Rules):", e);
+  } catch (e) {
+    console.error("Save Review Error:", e);
     throw e;
   }
 };
@@ -181,13 +153,12 @@ export const DbService = {
   getSensors: async (fieldIds: number[]) => {
     if (fieldIds.length === 0) return [];
     try {
-      const db = getAgricareDb();
       const q = query(collection(db, 'sensors'), where('field_id', 'in', fieldIds));
       const snap = await getDocs(q);
       return snap.docs.map(d => d.data() as Sensor);
     } catch (e) {
       console.error("DbService getSensors error:", e);
-      return [];
+      throw e;
     }
   },
   getReviews,
