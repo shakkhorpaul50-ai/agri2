@@ -28,12 +28,14 @@ const CommentSection: React.FC = () => {
     if (!newComment || !userName || isSubmitting) return;
     
     setIsSubmitting(true);
-    const reviewData: Omit<Review, 'id'> = {
+    const timestamp = Date.now();
+    const reviewData: Review = {
+      id: `review_${timestamp}_${Math.floor(Math.random() * 1000)}`,
       name: userName,
       rating,
       text: newComment,
       date: "Just now",
-      createdAt: Date.now()
+      createdAt: timestamp
     };
     
     try {
@@ -48,7 +50,7 @@ const CommentSection: React.FC = () => {
       setRating(5);
     } catch (err: any) {
       console.error("Review Submission Error Detail:", err);
-      alert(`Failed to submit review: ${err.message || 'Unknown error'}. Please check console.`);
+      alert(`Failed to submit review: ${err.message || 'Unknown error'}. Please check if Firestore is configured with open rules or authenticated access.`);
     } finally {
       setIsSubmitting(false);
     }

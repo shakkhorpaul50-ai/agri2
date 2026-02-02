@@ -1,6 +1,6 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, limit, addDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, limit } from 'firebase/firestore';
 import { User, Field, Sensor } from '../types';
 
 // Configuration for project: agricare-4c725
@@ -142,7 +142,7 @@ export const deleteSensorFromDb = async (id: number): Promise<void> => {
 
 // --- Review Persistence ---
 export interface Review {
-  id?: string;
+  id: string;
   name: string;
   rating: number;
   text: string;
@@ -153,22 +153,23 @@ export interface Review {
 export const getReviews = async (): Promise<Review[]> => {
   try {
     const db = getAgricareDb();
-    // Removed orderBy('createdAt', 'desc') temporarily because it requires a composite index
-    // We will sort client-side for now to avoid crashes if index is missing.
-    const q = query(collection(db, 'reviews'), limit(20));
+    // Fetch limited set of reviews
+    const q = query(collection(db, 'reviews'), limit(30));
     const snap = await getDocs(q);
-    const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() } as Review));
+    const reviews = snap.docs.map(d => d.data() as Review);
+    // Client-side sort to ensure consistent display without needing composite indexes immediately
     return reviews.sort((a, b) => b.createdAt - a.createdAt);
   } catch (e: any) {
-    console.error("Get Reviews Error (Check Firebase Console for missing index):", e);
+    console.error("Get Reviews Error:", e);
     return [];
   }
 };
 
-export const saveReview = async (review: Omit<Review, 'id'>): Promise<void> => {
+export const saveReview = async (review: Review): Promise<void> => {
   try {
     const db = getAgricareDb();
-    await addDoc(collection(db, 'reviews'), review);
+    // Saving with a specific ID (timestamp) to match the fields/users pattern
+    await setDoc(doc(db, 'reviews', review.id), review);
   } catch (e: any) {
     console.error("Save Review Error (Verify Firebase Security Rules):", e);
     throw e;
