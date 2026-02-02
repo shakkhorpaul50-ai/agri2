@@ -1,117 +1,63 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 
-interface NavbarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  isLoggedIn: boolean;
-  onLogout: () => void;
-}
-
-const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, isLoggedIn, onLogout }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
+const Navbar: React.FC<{ activeTab: string, setActiveTab: (t: string) => void, isLoggedIn: boolean, onLogout: () => void }> = ({ activeTab, setActiveTab, isLoggedIn, onLogout }) => {
   const links = isLoggedIn 
     ? [
-        { id: 'dashboard', label: 'Dashboard' },
-        { id: 'fields', label: 'My Fields' },
-        { id: 'management', label: 'Management' },
-        { id: 'sensors', label: 'Sensors' }
+        { id: 'dashboard', label: 'Overview', icon: 'fa-grid-2' },
+        { id: 'intelligence', label: 'Intelligence', icon: 'fa-brain' },
+        { id: 'vision', label: 'AI Vision', icon: 'fa-eye' },
+        { id: 'management', label: 'Management', icon: 'fa-list-check' },
+        { id: 'sensors', label: 'Sensors', icon: 'fa-microchip' }
       ]
     : [
         { id: 'home', label: 'Home' },
-        { id: 'features-public', label: 'Features' },
         { id: 'how-it-works', label: 'How it Works' },
-        { id: 'public-dashboard', label: 'Public Demo' },
-        { id: 'pricing', label: 'Pricing' }
+        { id: 'pricing', label: 'Pricing' },
+        { id: 'public-demo', label: 'Public Demo' }
       ];
 
   return (
-    <nav className="bg-white border-b border-emerald-100 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('home')}>
-            <div className="flex-shrink-0 flex items-center gap-2">
-              <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
-                <i className="fas fa-leaf text-white text-xl"></i>
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-green-500 bg-clip-text text-transparent">Agricare</span>
-            </div>
+    <nav className="sticky top-0 z-[100] px-4 pt-4">
+      <div className="max-w-7xl mx-auto glass-card h-20 rounded-[2rem] px-8 flex justify-between items-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/40">
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('home')}>
+          <div className="w-11 h-11 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 group-hover:rotate-12 transition-transform">
+            <i className="fas fa-leaf text-xl"></i>
           </div>
-          
-          <div className="hidden md:ml-6 md:flex md:space-x-8 items-center">
-            {links.map(link => (
-              <button
-                key={link.id}
-                onClick={() => setActiveTab(link.id)}
-                className={`${
-                  activeTab === link.id
-                    ? 'border-emerald-500 text-slate-900'
-                    : 'border-transparent text-slate-500 hover:text-emerald-600 hover:border-emerald-300'
-                } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-16 transition-all duration-200`}
-              >
-                {link.label}
-              </button>
-            ))}
-            
-            {isLoggedIn ? (
-              <button 
-                onClick={onLogout}
-                className="ml-4 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              >
-                Logout
-              </button>
-            ) : (
-              <div className="flex items-center gap-3 ml-4">
-                <button 
-                  onClick={() => setActiveTab('login')}
-                  className="text-slate-600 hover:text-emerald-600 text-sm font-semibold"
-                >
-                  Login
-                </button>
-                <button 
-                  onClick={() => setActiveTab('signup')}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-md transition-all active:scale-95"
-                >
-                  Get Started
-                </button>
-              </div>
-            )}
-          </div>
+          <span className="text-2xl font-black text-slate-900 tracking-tighter">Agricare</span>
+        </div>
 
-          <div className="flex items-center md:hidden">
+        <div className="hidden md:flex items-center gap-2">
+          {links.map(l => (
             <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 focus:outline-none"
+              key={l.id}
+              onClick={() => setActiveTab(l.id)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                activeTab === l.id 
+                  ? 'bg-emerald-600 text-white shadow-md' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+              }`}
             >
-              <i className={`fas ${isOpen ? 'fa-times' : 'fa-bars'} text-xl`}></i>
+              {l.label}
             </button>
-          </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-4">
+          {isLoggedIn ? (
+            <div className="flex items-center gap-4">
+              <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-sm px-4 py-2 transition-colors">Logout</button>
+              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 border border-slate-200">
+                <i className="fas fa-user text-sm"></i>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setActiveTab('signup')} className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-sm font-black hover:bg-slate-800 transition-all shadow-xl active:scale-95">
+              Get Started
+            </button>
+          )}
         </div>
       </div>
-
-      {isOpen && (
-        <div className="md:hidden bg-white border-b border-emerald-50">
-          <div className="pt-2 pb-3 space-y-1">
-            {links.map(link => (
-              <button
-                key={link.id}
-                onClick={() => {
-                  setActiveTab(link.id);
-                  setIsOpen(false);
-                }}
-                className={`${
-                  activeTab === link.id
-                    ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                    : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-emerald-600'
-                } block pl-3 pr-4 py-2 border-l-4 text-base font-medium w-full text-left`}
-              >
-                {link.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </nav>
   );
 };
