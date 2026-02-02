@@ -5,6 +5,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  picture?: string;
+  googleId?: string;
   subscriptionPlan: SubscriptionPlan;
   subscriptionEnd: string;
 }

@@ -1,10 +1,26 @@
 
-import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, limit } from 'firebase/firestore';
+import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  getDocs, 
+  query, 
+  where,
+  deleteDoc,
+  limit,
+  Firestore
+} from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  Auth 
+} from 'firebase/auth';
 import { User, Field, Sensor } from '../types';
 
-// Configuration for project: agricare-4c725
 const firebaseConfig = {
   apiKey: "AIzaSyCeyl_T15XCsu0-tbXoXaZ2t7C3oMLjyF8",
   authDomain: "agricare-4c725.firebaseapp.com",
@@ -14,63 +30,80 @@ const firebaseConfig = {
   appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
 };
 
-// Initialize app safely as a singleton
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
+// ABSOLUTE IDENTITY CONSTANTS
+export const ADMIN_EMAIL = 'shakkhorpaul50@gmail.com';
+export const DEBI_EMAIL = 'nitebiswaskotha@gmail.com';
 
-export const loginUser = async (email: string, pass: string): Promise<User | null> => {
-  try {
-    const cred = await signInWithEmailAndPassword(auth, email, pass);
-    const userDocRef = doc(db, 'users', cred.user.uid);
-    const userDoc = await getDoc(userDocRef);
+let db: Firestore | null = null;
+let auth: Auth | null = null;
+
+try {
+  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  db = getFirestore(app);
+  auth = getAuth(app);
+} catch (err) {
+  console.error("Firebase initialization failed:", err);
+}
+
+export const isDatabaseEnabled = () => !!db;
+export const isAdmin = (email: string) => email.toLowerCase().trim() === ADMIN_EMAIL;
+
+/**
+ * Authentication via Google Popup
+ */
+export const loginWithGoogle = async (): Promise<User | null> => {
+  if (!auth || !db) throw new Error("Database or Auth not initialized");
+  const provider = new GoogleAuthProvider();
+  const result = await signInWithPopup(auth, provider);
+  const user = result.user;
+
+  if (user && user.email) {
+    const emailLower = user.email.toLowerCase();
+    const userRef = doc(db, 'users', emailLower);
+    const snap = await getDoc(userRef);
     
-    if (userDoc.exists()) {
-      return userDoc.data() as User;
+    let agricareUser: User;
+    
+    if (snap.exists()) {
+      agricareUser = snap.data() as User;
     } else {
-      const fallbackUser: User = {
-        id: cred.user.uid,
-        name: email.split('@')[0],
-        email: email,
+      agricareUser = {
+        id: user.uid,
+        name: user.displayName || 'Farmer',
+        email: emailLower,
+        picture: user.photoURL || '',
+        googleId: user.uid,
         subscriptionPlan: 'basic',
         subscriptionEnd: new Date(Date.now() + 31536000000).toISOString()
       };
-      await setDoc(userDocRef, fallbackUser);
-      return fallbackUser;
+      await setDoc(userRef, agricareUser);
     }
-  } catch (e) {
-    console.error("Login Error:", e);
-    throw e;
+    return agricareUser;
   }
+  return null;
 };
 
-export const registerUser = async (user: User, pass: string): Promise<User> => {
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, user.email, pass);
-    const userData = { ...user, id: cred.user.uid };
-    await setDoc(doc(db, 'users', cred.user.uid), userData);
-    return userData;
-  } catch (e) {
-    console.error("Registration Error:", e);
-    throw e;
-  }
-};
+/**
+ * Agricare Specific Database Operations
+ */
 
 export const syncFields = async (userId: string): Promise<Field[]> => {
+  if (!db) return [];
   try {
     const q = query(collection(db, 'fields'), where('user_id', '==', userId));
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as Field);
   } catch (e) {
     console.error("Sync Fields Error:", e);
-    throw e;
+    return [];
   }
 };
 
 export const addFieldToDb = async (field: Field): Promise<void> => {
+  if (!db) throw new Error("Database offline");
   try {
-    // Ensure document ID is a string
-    await setDoc(doc(db, 'fields', String(field.field_id)), field);
+    const docId = String(field.field_id);
+    await setDoc(doc(db, 'fields', docId), field);
   } catch (e) {
     console.error("Add Field Error:", e);
     throw e;
@@ -78,7 +111,7 @@ export const addFieldToDb = async (field: Field): Promise<void> => {
 };
 
 export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> => {
-  if (userFields.length === 0) return [];
+  if (!db || userFields.length === 0) return [];
   try {
     const userFieldIds = userFields.map(f => f.field_id);
     const chunks = [];
@@ -95,13 +128,15 @@ export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> 
     return allSensors;
   } catch (e) {
     console.error("Sync Sensors Error:", e);
-    throw e;
+    return [];
   }
 };
 
 export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
+  if (!db) throw new Error("Database offline");
   try {
-    await setDoc(doc(db, 'sensors', String(sensor.sensor_id)), sensor);
+    const docId = String(sensor.sensor_id);
+    await setDoc(doc(db, 'sensors', docId), sensor);
   } catch (e) {
     console.error("Update Sensor Error:", e);
     throw e;
@@ -109,8 +144,10 @@ export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
 };
 
 export const deleteSensorFromDb = async (id: number): Promise<void> => {
+  if (!db) throw new Error("Database offline");
   try {
-    await deleteDoc(doc(db, 'sensors', String(id)));
+    const docId = String(id);
+    await deleteDoc(doc(db, 'sensors', docId));
   } catch (e) {
     console.error("Delete Sensor Error:", e);
     throw e;
@@ -128,6 +165,7 @@ export interface Review {
 }
 
 export const getReviews = async (): Promise<Review[]> => {
+  if (!db) return [];
   try {
     const q = query(collection(db, 'reviews'), limit(30));
     const snap = await getDocs(q);
@@ -135,11 +173,12 @@ export const getReviews = async (): Promise<Review[]> => {
     return reviews.sort((a, b) => b.createdAt - a.createdAt);
   } catch (e) {
     console.error("Get Reviews Error:", e);
-    throw e;
+    return [];
   }
 };
 
 export const saveReview = async (review: Review): Promise<void> => {
+  if (!db) throw new Error("Database offline");
   try {
     await setDoc(doc(db, 'reviews', review.id), review);
   } catch (e) {
@@ -151,7 +190,7 @@ export const saveReview = async (review: Review): Promise<void> => {
 export const DbService = {
   getFields: syncFields,
   getSensors: async (fieldIds: number[]) => {
-    if (fieldIds.length === 0) return [];
+    if (!db || fieldIds.length === 0) return [];
     try {
       const q = query(collection(db, 'sensors'), where('field_id', 'in', fieldIds));
       const snap = await getDocs(q);
