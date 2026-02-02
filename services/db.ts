@@ -1,7 +1,6 @@
-
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, orderBy, limit, addDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, limit, addDoc } from 'firebase/firestore';
 import { User, Field, Sensor } from '../types';
 
 // Configuration for project: agricare-4c725
@@ -14,15 +13,26 @@ const firebaseConfig = {
   appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
 };
 
-// Initialize app immediately to register services
+// Initialize app safely
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Access services safely. We use functions to ensure they are accessed only after the module is fully loaded.
-const getAgricareAuth = () => getAuth(app);
+// Access services with validation
+const getAgricareAuth = () => {
+  try {
+    return getAuth(app);
+  } catch (e) {
+    console.error("Firebase Auth initialization failed:", e);
+    throw e;
+  }
+};
+
 const getAgricareDb = () => {
-  const db = getFirestore(app);
-  if (!db) throw new Error("Firestore service not initialized");
-  return db;
+  try {
+    return getFirestore(app);
+  } catch (e) {
+    console.error("Firebase Firestore initialization failed:", e);
+    throw e;
+  }
 };
 
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
@@ -48,6 +58,7 @@ export const loginUser = async (email: string, pass: string): Promise<User | nul
       return fallbackUser;
     }
   } catch (authError: any) {
+    console.error("Login Error:", authError);
     throw authError;
   }
 };
@@ -142,11 +153,14 @@ export interface Review {
 export const getReviews = async (): Promise<Review[]> => {
   try {
     const db = getAgricareDb();
-    const q = query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(10));
+    // Removed orderBy('createdAt', 'desc') temporarily because it requires a composite index
+    // We will sort client-side for now to avoid crashes if index is missing.
+    const q = query(collection(db, 'reviews'), limit(20));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Review));
-  } catch (e) {
-    console.error("Get Reviews Error:", e);
+    const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() } as Review));
+    return reviews.sort((a, b) => b.createdAt - a.createdAt);
+  } catch (e: any) {
+    console.error("Get Reviews Error (Check Firebase Console for missing index):", e);
     return [];
   }
 };
@@ -155,8 +169,8 @@ export const saveReview = async (review: Omit<Review, 'id'>): Promise<void> => {
   try {
     const db = getAgricareDb();
     await addDoc(collection(db, 'reviews'), review);
-  } catch (e) {
-    console.error("Save Review Error:", e);
+  } catch (e: any) {
+    console.error("Save Review Error (Verify Firebase Security Rules):", e);
     throw e;
   }
 };

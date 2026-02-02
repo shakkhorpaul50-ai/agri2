@@ -46,8 +46,9 @@ const CommentSection: React.FC = () => {
       setNewComment("");
       setUserName("");
       setRating(5);
-    } catch (err) {
-      alert("Failed to submit review. Please try again.");
+    } catch (err: any) {
+      console.error("Review Submission Error Detail:", err);
+      alert(`Failed to submit review: ${err.message || 'Unknown error'}. Please check console.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -109,7 +110,7 @@ const CommentSection: React.FC = () => {
               disabled={isSubmitting}
               className="bg-[#049364] text-white px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#037d55] transition-all shadow-xl shadow-emerald-900/10 active:scale-95 disabled:opacity-50"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Review'}
+              {isSubmitting ? 'SUBMITTING...' : 'Submit Review'}
             </button>
           </form>
         </div>
