@@ -1,11 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, Field, CropRecommendation } from '../../types';
 import { 
   getCropAnalysis, 
   getSoilHealthSummary, 
   getDetailedManagementPlan, 
-  SoilInsight
+  getCompanionCropAdvisory,
+  SoilInsight,
+  CompanionAdvisory
 } from '../../services/gemini';
 import { syncFields, syncSensorsFromDb, addFieldToDb } from '../../services/db';
 
@@ -21,6 +22,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [selectedField, setSelectedField] = useState<Field | null>(null);
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
   const [soilInsight, setSoilInsight] = useState<SoilInsight | null>(null);
+  const [companionAdvisory, setCompanionAdvisory] = useState<CompanionAdvisory | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentDataState, setCurrentDataState] = useState<any>(null);
@@ -43,12 +45,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setLoading(true);
     setRecommendations(null);
     setSoilInsight(null);
+    setCompanionAdvisory(null);
     setManagementPlan(null);
     
     try {
       const fieldSensors = await syncSensorsFromDb([field]);
-      
-      // Strict data state - only values from registered sensors will be present
       const stats: any = {};
       
       fieldSensors.forEach(s => {
@@ -65,15 +66,17 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      const [analysis, insight, plan] = await Promise.all([
+      const [analysis, insight, plan, companion] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
-        getDetailedManagementPlan(field, stats)
+        getDetailedManagementPlan(field, stats),
+        getCompanionCropAdvisory(field, stats)
       ]);
       
       setRecommendations(analysis);
       setSoilInsight(insight);
       setManagementPlan(plan);
+      setCompanionAdvisory(companion);
     } catch (err) {
       console.error("Critical AI node error", err);
     } finally {
@@ -113,7 +116,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Sidebar */}
         <div className="lg:col-span-1 space-y-4">
           <div className="flex justify-between items-center px-2">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Your Plots</h3>
@@ -140,7 +142,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="lg:col-span-3">
           {!selectedField ? (
             <div className="bg-white rounded-[3rem] p-32 text-center border-dashed border-2 border-slate-200 flex flex-col items-center">
@@ -151,7 +152,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in duration-700">
-              {/* Pillar Visualization Header */}
               <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full"></div>
                 <div className="relative z-10">
@@ -189,43 +189,63 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
                   <h3 className="text-2xl font-black text-slate-800">Processing Registered Telemetry...</h3>
-                  <p className="text-slate-400 mt-2">Gemini 2.5 Flash is analyzing your specific field pillars.</p>
+                  <p className="text-slate-400 mt-2">Gemini is analyzing your specific field pillars.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Strategy Column */}
                   <div className="lg:col-span-2 space-y-8">
-                    {/* Restoration Card */}
-                    <div className="bg-white p-10 rounded-[3rem] border border-emerald-50 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-8 text-emerald-500/5 text-8xl transition-transform group-hover:scale-110">
-                        <i className="fas fa-dna"></i>
-                      </div>
-                      <h3 className="font-black text-2xl text-slate-900 mb-6 flex items-center gap-3">
-                        <i className="fas fa-seedling text-emerald-600"></i> Soil Restoration Strategy
-                      </h3>
-                      
-                      <div className="space-y-6">
-                        <div className="p-8 rounded-[2rem] bg-emerald-50/50 text-slate-700 border border-emerald-50">
-                          <p className="text-lg leading-relaxed font-bold italic text-slate-800">
-                            "{soilInsight?.summary || "Analyzing sensor intersections..."}"
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Restoration Strategy */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-emerald-50 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden group">
+                        <h3 className="font-black text-xl text-slate-900 mb-6 flex items-center gap-3">
+                          <i className="fas fa-dna text-emerald-600"></i> Soil Restoration
+                        </h3>
+                        <div className="space-y-4">
+                          <p className="text-sm leading-relaxed text-slate-600 font-medium">
+                            {soilInsight?.summary || "Analyzing sensor intersections..."}
                           </p>
-                        </div>
-                        
-                        <div className="bg-slate-900 text-white p-6 rounded-[2.5rem] flex items-center justify-between shadow-2xl group-hover:bg-slate-800 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center">
-                              <i className="fas fa-hand-holding-droplet text-white"></i>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Recommended Treatment</div>
-                              <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || "Calculating..."}</div>
-                            </div>
+                          <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                             <div className="text-[8px] font-black uppercase text-emerald-600 mb-1">Top Recommendation</div>
+                             <div className="font-bold text-slate-800 text-sm">{soilInsight?.soil_fertilizer || "Calculating..."}</div>
                           </div>
                         </div>
                       </div>
+
+                      {/* Companion Intercropping (NEW MODULE) */}
+                      <div className="bg-emerald-900 p-8 rounded-[2.5rem] text-white shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group">
+                        <div className="absolute -right-4 -top-4 opacity-10 text-6xl group-hover:scale-125 transition-transform">
+                          <i className="fas fa-leaf"></i>
+                        </div>
+                        <h3 className="font-black text-xl mb-6 flex items-center gap-3">
+                          <i className="fas fa-handshake text-emerald-400"></i> Intercropping Strategy
+                        </h3>
+                        {companionAdvisory ? (
+                          <div className="space-y-4">
+                            <div>
+                              <div className="text-[8px] font-black uppercase text-emerald-400 mb-1">Recommended Companion</div>
+                              <div className="font-black text-lg">{companionAdvisory.companion_name}</div>
+                            </div>
+                            <p className="text-[11px] text-emerald-100/80 leading-relaxed italic">"{companionAdvisory.benefits}"</p>
+                            <div className="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
+                              <div>
+                                <div className="text-[7px] font-black uppercase tracking-widest text-emerald-300">Density</div>
+                                <div className="text-xs font-bold">{companionAdvisory.density_per_sqm}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[7px] font-black uppercase tracking-widest text-emerald-300">Compatibility</div>
+                                <div className="text-xs font-bold text-emerald-400">{companionAdvisory.compatibility_score}%</div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="py-10 text-center opacity-30">
+                            <i className="fas fa-robot fa-spin text-2xl mb-2"></i>
+                            <p className="text-[10px] font-black uppercase">Calculating Synergy...</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
-                    {/* Crop Index */}
                     <div>
                       <h3 className="font-black text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
                         <i className="fas fa-microscope text-emerald-600"></i> Harvest Compatibility Index
@@ -262,7 +282,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                   </div>
                   
-                  {/* Roadmap Column */}
                   <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm h-fit sticky top-24">
                     <h3 className="font-black text-2xl text-slate-900 mb-10 flex items-center gap-3">
                       <i className="fas fa-route text-emerald-600"></i> Operational Roadmap
