@@ -7,31 +7,48 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [newFieldData, setNewFieldData] = useState({ name: '', location: '', size: '', soilType: 'Loamy' });
 
   useEffect(() => {
     const loadData = async () => {
-      const userFields = await syncFields(user.id);
-      setFields(userFields);
-      setLoading(false);
+      try {
+        const userFields = await syncFields(user.id);
+        setFields(userFields);
+      } catch (err) {
+        console.error("Failed to load fields", err);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, [user.id]);
 
   const handleAddField = async (e: React.FormEvent) => {
     e.preventDefault();
-    const f: Field = { 
-      field_id: Date.now(), 
-      user_id: user.id, 
-      field_name: newFieldData.name, 
-      location: newFieldData.location, 
-      size: parseFloat(newFieldData.size) || 0, 
-      soil_type: newFieldData.soilType 
-    };
-    await addFieldToDb(f);
-    setFields([...fields, f]);
-    setShowAddFieldModal(false);
-    setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
+    if (isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const f: Field = { 
+        field_id: Date.now(), 
+        user_id: user.id, 
+        field_name: newFieldData.name, 
+        location: newFieldData.location, 
+        size: parseFloat(newFieldData.size) || 0, 
+        soil_type: newFieldData.soilType 
+      };
+      
+      await addFieldToDb(f);
+      setFields(prev => [...prev, f]);
+      setShowAddFieldModal(false);
+      setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
+    } catch (err) {
+      console.error("Persistence error:", err);
+      alert("Could not save field to database. Please check your internet connection.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -132,30 +149,30 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
       {/* Add Field Modal */}
       {showAddFieldModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-900">Add New Plot</h2>
+          <div className="bg-white p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black text-slate-900">Add New Plot</h2>
               <button onClick={() => setShowAddFieldModal(false)} className="text-slate-400 hover:text-slate-600">
-                <i className="fas fa-times"></i>
+                <i className="fas fa-times text-xl"></i>
               </button>
             </div>
-            <form onSubmit={handleAddField} className="space-y-4">
+            <form onSubmit={handleAddField} className="space-y-6">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Field Name</label>
-                <input required className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. Rice Paddy A" value={newFieldData.name} onChange={e => setNewFieldData({...newFieldData, name: e.target.value})} />
+                <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Field Name</label>
+                <input required className="w-full px-6 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="e.g. Rice Paddy A" value={newFieldData.name} onChange={e => setNewFieldData({...newFieldData, name: e.target.value})} />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Location</label>
-                <input required className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. Bogura, Bangladesh" value={newFieldData.location} onChange={e => setNewFieldData({...newFieldData, location: e.target.value})} />
+                <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Location</label>
+                <input required className="w-full px-6 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="e.g. Bogura, Bangladesh" value={newFieldData.location} onChange={e => setNewFieldData({...newFieldData, location: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Size (ha)</label>
-                  <input required type="number" step="0.1" className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" placeholder="1.5" value={newFieldData.size} onChange={e => setNewFieldData({...newFieldData, size: e.target.value})} />
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Size (ha)</label>
+                  <input required type="number" step="0.1" className="w-full px-6 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="1.5" value={newFieldData.size} onChange={e => setNewFieldData({...newFieldData, size: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Soil Type</label>
-                  <select className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" value={newFieldData.soilType} onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})}>
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Soil Type</label>
+                  <select className="w-full px-6 py-4 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500 font-black" value={newFieldData.soilType} onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})}>
                     <option value="Loamy">Loamy</option>
                     <option value="Clay">Clay</option>
                     <option value="Sandy">Sandy</option>
@@ -163,7 +180,13 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
                   </select>
                 </div>
               </div>
-              <button type="submit" className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-all mt-4">Register Field</button>
+              <button 
+                type="submit" 
+                disabled={isSaving}
+                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-900/10 hover:bg-emerald-700 transition-all mt-4 disabled:opacity-50"
+              >
+                {isSaving ? 'Registering...' : 'Register Field'}
+              </button>
             </form>
           </div>
         </div>

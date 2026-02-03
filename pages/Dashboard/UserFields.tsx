@@ -32,10 +32,14 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   useEffect(() => {
     const init = async () => {
-      const userFields = await syncFields(user.id);
-      setFields(userFields);
-      if (userFields.length > 0) {
-        handleFieldSelect(userFields[0]);
+      try {
+        const userFields = await syncFields(user.id);
+        setFields(userFields);
+        if (userFields.length > 0) {
+          handleFieldSelect(userFields[0]);
+        }
+      } catch (err) {
+        console.error("Failed to sync fields", err);
       }
     };
     init();
@@ -87,6 +91,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   const handleAddField = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingField) return;
+
     setIsSavingField(true);
     try {
       const f: Field = { 
@@ -97,13 +103,15 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         size: parseFloat(newFieldData.size) || 0, 
         soil_type: newFieldData.soilType 
       };
+      
       await addFieldToDb(f);
       setFields(prev => [...prev, f]);
       setShowAddFieldModal(false);
       setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
       handleFieldSelect(f);
     } catch (err) {
-      alert("Error saving field. Please check your connection.");
+      console.error("Persistence error:", err);
+      alert("Error saving field. Please check your database connection and try again.");
     } finally {
       setIsSavingField(false);
     }
@@ -205,7 +213,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                       </div>
 
-                      {/* Precision Matcher Card (NEW) */}
+                      {/* Precision Matcher Card */}
                       <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden group">
                         <div className="absolute -right-8 -top-8 opacity-10 text-8xl group-hover:scale-110 transition-transform">
                           <i className="fas fa-bullseye"></i>
@@ -289,21 +297,30 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
       {showAddFieldModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl">
-            <h2 className="text-3xl font-black mb-8">Register New Plot</h2>
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black text-slate-900">Add New Plot</h2>
+              <button onClick={() => setShowAddFieldModal(false)} className="text-slate-400 hover:text-slate-600">
+                <i className="fas fa-times text-xl"></i>
+              </button>
+            </div>
             <form onSubmit={handleAddField} className="space-y-6">
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Field Name</label>
-                <input required type="text" value={newFieldData.name} onChange={e => setNewFieldData({...newFieldData, name: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Rice Paddy Alpha" />
+                <input required type="text" value={newFieldData.name} onChange={e => setNewFieldData({...newFieldData, name: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="e.g. Rice Paddy Alpha" />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Location</label>
+                <input required type="text" value={newFieldData.location} onChange={e => setNewFieldData({...newFieldData, location: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="e.g. Bogura, Bangladesh" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Size (ha)</label>
-                  <input required type="number" step="0.1" value={newFieldData.size} onChange={e => setNewFieldData({...newFieldData, size: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" />
+                  <input required type="number" step="0.1" value={newFieldData.size} onChange={e => setNewFieldData({...newFieldData, size: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-medium" placeholder="1.2" />
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Soil Type</label>
-                  <select value={newFieldData.soilType} onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none">
+                  <select value={newFieldData.soilType} onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-emerald-500 font-black">
                     <option value="Loamy">Loamy</option>
                     <option value="Clay">Clay</option>
                     <option value="Sandy">Sandy</option>
@@ -314,11 +331,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <button 
                 type="submit" 
                 disabled={isSavingField}
-                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
+                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-900/10 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 mt-4"
               >
-                {isSavingField ? 'SAVING DATA...' : 'Register and Activate AI'}
+                {isSavingField ? 'Registering...' : 'Register Field'}
               </button>
-              <button type="button" onClick={() => setShowAddFieldModal(false)} className="w-full text-slate-400 font-bold text-xs uppercase">Cancel</button>
             </form>
           </div>
         </div>
