@@ -69,21 +69,21 @@ const cleanAndParseJSON = (text: string | undefined) => {
 const formatDataForPrompt = (data: any) => {
   const format = (key: string, label: string, unit: string = '') => {
     const val = data[key];
-    if (val === undefined || val === null) return `${label}: [MISSING - SENSOR NOT REGISTERED]`;
+    if (val === undefined || val === null) return `${label}: [MISSING]`;
     return `${label}: ${Number(val).toFixed(2)}${unit}`;
   };
 
   const npkStatus = (data.npk_n !== undefined) 
     ? `Nitrogen=${data.npk_n}, Phosphorus=${data.npk_p}, Potassium=${data.npk_k}` 
-    : "[MISSING - NPK ANALYZER NOT REGISTERED]";
+    : "[SENSORS OFFLINE]";
 
   return `
-    [TELEMETRY PILLARS]
-    MOISTURE: ${format('moisture', 'Current', '%')}
-    pH LEVEL: ${format('ph_level', 'Current')}
+    [SENSOR PROFILE]
+    MOISTURE: ${format('moisture', 'Value', '%')}
+    pH: ${format('ph_level', 'Value')}
     NPK: ${npkStatus}
-    TEMP: ${format('temperature', 'Current', '°C')}
-    FIELD: ${data.field_name}, Soil: ${data.soil_type || 'Loamy'}
+    TEMP: ${format('temperature', 'Value', '°C')}
+    FIELD: ${data.field_name}, Soil: ${data.soil_type}
   `;
 };
 
@@ -135,7 +135,7 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Recommend 3 crops based on sensor data: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Suggest 3 crops based on soil metrics: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -159,38 +159,14 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   } catch (error) { return []; }
 };
 
-export const getSoilToCropDiagnostic = async (field: Field, latestData: any): Promise<SoilCropDiagnostic | null> => {
+export const getPrecisionSensorCropMatch = async (field: Field, latestData: any): Promise<PrecisionCropMatch | null> => {
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Perform a Sensor-to-Crop Diagnostic for the following field: ${formatDataForPrompt({...latestData, ...field})}. Explain why specific crops are recommended based on these exact pH and NPK levels.`,
+      contents: `Perform a High-Fidelity Precision Match for this sensor profile: ${formatDataForPrompt({...latestData, ...field})}. 
+      Which specific crop variety is the absolute best match for these exact NPK and pH values?`,
       config: {
-        systemInstruction: "You are a Bio-Agricultural Analytics Engine. Analyze the sensor data to provide a technical crop suitability scorecard. Link your recommendation directly to the observed Nitrogen and pH values. Output MUST be valid JSON.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            suitability_index: { type: Type.NUMBER },
-            logic: { type: Type.STRING },
-            nutrient_limitation: { type: Type.STRING },
-            suggested_variety: { type: Type.STRING }
-          },
-          required: ["suitability_index", "logic", "nutrient_limitation", "suggested_variety"]
-        }
-      }
-    });
-    return cleanAndParseJSON(response.text);
-  } catch (error) { return null; }
-};
-
-export const getPrecisionCropMatch = async (field: Field, latestData: any): Promise<PrecisionCropMatch | null> => {
-  try {
-    const response = await aiProvider.generate({
-      model: MODEL_NAME,
-      contents: `Provide a Precision Bio-Match Analysis for this sensor profile: ${formatDataForPrompt({...latestData, ...field})}. 
-      Determine which specific crop has the absolute highest biological synergy with these exact Nitrogen and pH levels.`,
-      config: {
-        systemInstruction: "You are a Digital Agronomist specializing in Bio-Digital Telemetry. Analyze soil sensors to find the single most compatible crop. Focus on the relationship between current pH and Nutrient availability. Output MUST be valid JSON.",
+        systemInstruction: "You are a Bio-Digital Agronomist. Your goal is to analyze specific sensor telemetry (NPK, pH, Moisture) and find the most biologically compatible crop. Output MUST be valid JSON.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -201,6 +177,29 @@ export const getPrecisionCropMatch = async (field: Field, latestData: any): Prom
             critical_metric: { type: Type.STRING }
           },
           required: ["best_crop", "match_probability", "biological_advantage", "critical_metric"]
+        }
+      }
+    });
+    return cleanAndParseJSON(response.text);
+  } catch (error) { return null; }
+};
+
+export const getSoilToCropDiagnostic = async (field: Field, latestData: any): Promise<SoilCropDiagnostic | null> => {
+  try {
+    const response = await aiProvider.generate({
+      model: MODEL_NAME,
+      contents: `Provide a Soil-to-Crop Diagnostic: ${formatDataForPrompt({...latestData, ...field})}.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            suitability_index: { type: Type.NUMBER },
+            logic: { type: Type.STRING },
+            nutrient_limitation: { type: Type.STRING },
+            suggested_variety: { type: Type.STRING }
+          },
+          required: ["suitability_index", "logic", "nutrient_limitation", "suggested_variety"]
         }
       }
     });
@@ -233,9 +232,8 @@ export const getCompanionCropAdvisory = async (field: Field, latestData: any): P
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Suggest a companion intercropping strategy based on sensor data: ${formatDataForPrompt({...latestData, ...field})}.`,
+      contents: `Companion intercropping strategy for: ${formatDataForPrompt({...latestData, ...field})}.`,
       config: {
-        systemInstruction: "You are an agricultural researcher. Suggest ONE specific companion crop that maximizes land usage and soil health based on current NPK and moisture. Output MUST be valid JSON.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -257,7 +255,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Build a 4-step Operational Roadmap based on sensor data: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `4-step Roadmap based on: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -283,7 +281,7 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Provide prescriptions: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Prescriptions for: ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
