@@ -101,7 +101,13 @@ export interface CompanionAdvisory {
   compatibility_score: number;
 }
 
-// Added missing ManagementPrescription interface to fix compilation error in Management.tsx
+export interface PrecisionCropMatch {
+  best_crop: string;
+  match_probability: number;
+  biological_advantage: string;
+  critical_metric: string;
+}
+
 export interface ManagementPrescription {
   irrigation: {
     needed: boolean;
@@ -144,6 +150,31 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
     });
     return cleanAndParseJSON(response.text) || [];
   } catch (error) { return []; }
+};
+
+export const getPrecisionCropMatch = async (field: Field, latestData: any): Promise<PrecisionCropMatch | null> => {
+  try {
+    const response = await aiProvider.generate({
+      model: MODEL_NAME,
+      contents: `Provide a Precision Bio-Match Analysis for this sensor profile: ${formatDataForPrompt({...latestData, ...field})}. 
+      Determine which specific crop has the absolute highest biological synergy with these exact Nitrogen and pH levels.`,
+      config: {
+        systemInstruction: "You are a Digital Agronomist specializing in Bio-Digital Telemetry. Analyze soil sensors to find the single most compatible crop. Focus on the relationship between current pH and Nutrient availability. Output MUST be valid JSON.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            best_crop: { type: Type.STRING },
+            match_probability: { type: Type.NUMBER },
+            biological_advantage: { type: Type.STRING },
+            critical_metric: { type: Type.STRING }
+          },
+          required: ["best_crop", "match_probability", "biological_advantage", "critical_metric"]
+        }
+      }
+    });
+    return cleanAndParseJSON(response.text);
+  } catch (error) { return null; }
 };
 
 export const getSoilHealthSummary = async (field: Field, latestData: any): Promise<SoilInsight> => {
@@ -217,7 +248,6 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   } catch (error) { return []; }
 };
 
-// Updated return type to explicitly use ManagementPrescription interface
 export const getManagementPrescriptions = async (field: Field, latestData: any): Promise<ManagementPrescription | null> => {
   try {
     const response = await aiProvider.generate({

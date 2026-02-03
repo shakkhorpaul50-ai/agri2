@@ -5,8 +5,10 @@ import {
   getSoilHealthSummary, 
   getDetailedManagementPlan, 
   getCompanionCropAdvisory,
+  getPrecisionCropMatch,
   SoilInsight,
-  CompanionAdvisory
+  CompanionAdvisory,
+  PrecisionCropMatch
 } from '../../services/gemini';
 import { syncFields, syncSensorsFromDb, addFieldToDb } from '../../services/db';
 
@@ -23,6 +25,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
   const [soilInsight, setSoilInsight] = useState<SoilInsight | null>(null);
   const [companionAdvisory, setCompanionAdvisory] = useState<CompanionAdvisory | null>(null);
+  const [precisionMatch, setPrecisionMatch] = useState<PrecisionCropMatch | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentDataState, setCurrentDataState] = useState<any>(null);
@@ -46,6 +49,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setRecommendations(null);
     setSoilInsight(null);
     setCompanionAdvisory(null);
+    setPrecisionMatch(null);
     setManagementPlan(null);
     
     try {
@@ -66,17 +70,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      const [analysis, insight, plan, companion] = await Promise.all([
+      const [analysis, insight, plan, companion, precision] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
         getDetailedManagementPlan(field, stats),
-        getCompanionCropAdvisory(field, stats)
+        getCompanionCropAdvisory(field, stats),
+        getPrecisionCropMatch(field, stats)
       ]);
       
       setRecommendations(analysis);
       setSoilInsight(insight);
       setManagementPlan(plan);
       setCompanionAdvisory(companion);
+      setPrecisionMatch(precision);
     } catch (err) {
       console.error("Critical AI node error", err);
     } finally {
@@ -211,36 +217,38 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                       </div>
 
-                      {/* Companion Intercropping (NEW MODULE) */}
-                      <div className="bg-emerald-900 p-8 rounded-[2.5rem] text-white shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group">
-                        <div className="absolute -right-4 -top-4 opacity-10 text-6xl group-hover:scale-125 transition-transform">
-                          <i className="fas fa-leaf"></i>
+                      {/* Sensor-to-Crop Matcher (NEW TASK) */}
+                      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group">
+                        <div className="absolute -right-8 -top-8 opacity-10 text-8xl group-hover:scale-110 transition-transform">
+                          <i className="fas fa-crosshairs"></i>
                         </div>
                         <h3 className="font-black text-xl mb-6 flex items-center gap-3">
-                          <i className="fas fa-handshake text-emerald-400"></i> Intercropping Strategy
+                          <i className="fas fa-bullseye text-emerald-400"></i> Sensor Compatibility
                         </h3>
-                        {companionAdvisory ? (
+                        {precisionMatch ? (
                           <div className="space-y-4">
                             <div>
-                              <div className="text-[8px] font-black uppercase text-emerald-400 mb-1">Recommended Companion</div>
-                              <div className="font-black text-lg">{companionAdvisory.companion_name}</div>
+                              <div className="text-[8px] font-black uppercase text-slate-400 mb-1">Precision Bio-Match</div>
+                              <div className="font-black text-2xl text-emerald-400">{precisionMatch.best_crop}</div>
                             </div>
-                            <p className="text-[11px] text-emerald-100/80 leading-relaxed italic">"{companionAdvisory.benefits}"</p>
-                            <div className="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
-                              <div>
-                                <div className="text-[7px] font-black uppercase tracking-widest text-emerald-300">Density</div>
-                                <div className="text-xs font-bold">{companionAdvisory.density_per_sqm}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${precisionMatch.match_probability}%` }}></div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-[7px] font-black uppercase tracking-widest text-emerald-300">Compatibility</div>
-                                <div className="text-xs font-bold text-emerald-400">{companionAdvisory.compatibility_score}%</div>
-                              </div>
+                              <span className="text-[10px] font-bold text-emerald-400">{precisionMatch.match_probability}%</span>
+                            </div>
+                            <p className="text-[10px] text-slate-300 leading-relaxed italic border-l-2 border-emerald-500 pl-3">
+                              {precisionMatch.biological_advantage}
+                            </p>
+                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                              <div className="text-[7px] font-black uppercase tracking-widest text-slate-500">Key Driver</div>
+                              <div className="text-[11px] font-bold text-slate-300">{precisionMatch.critical_metric}</div>
                             </div>
                           </div>
                         ) : (
                           <div className="py-10 text-center opacity-30">
-                            <i className="fas fa-robot fa-spin text-2xl mb-2"></i>
-                            <p className="text-[10px] font-black uppercase">Calculating Synergy...</p>
+                            <i className="fas fa-atom fa-spin text-2xl mb-2"></i>
+                            <p className="text-[10px] font-black uppercase">Sequencing Telemetry...</p>
                           </div>
                         )}
                       </div>
