@@ -108,6 +108,13 @@ export interface PrecisionCropMatch {
   critical_metric: string;
 }
 
+export interface SoilCropDiagnostic {
+  suitability_index: number;
+  logic: string;
+  nutrient_limitation: string;
+  suggested_variety: string;
+}
+
 export interface ManagementPrescription {
   irrigation: {
     needed: boolean;
@@ -150,6 +157,30 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
     });
     return cleanAndParseJSON(response.text) || [];
   } catch (error) { return []; }
+};
+
+export const getSoilToCropDiagnostic = async (field: Field, latestData: any): Promise<SoilCropDiagnostic | null> => {
+  try {
+    const response = await aiProvider.generate({
+      model: MODEL_NAME,
+      contents: `Perform a Sensor-to-Crop Diagnostic for the following field: ${formatDataForPrompt({...latestData, ...field})}. Explain why specific crops are recommended based on these exact pH and NPK levels.`,
+      config: {
+        systemInstruction: "You are a Bio-Agricultural Analytics Engine. Analyze the sensor data to provide a technical crop suitability scorecard. Link your recommendation directly to the observed Nitrogen and pH values. Output MUST be valid JSON.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            suitability_index: { type: Type.NUMBER },
+            logic: { type: Type.STRING },
+            nutrient_limitation: { type: Type.STRING },
+            suggested_variety: { type: Type.STRING }
+          },
+          required: ["suitability_index", "logic", "nutrient_limitation", "suggested_variety"]
+        }
+      }
+    });
+    return cleanAndParseJSON(response.text);
+  } catch (error) { return null; }
 };
 
 export const getPrecisionCropMatch = async (field: Field, latestData: any): Promise<PrecisionCropMatch | null> => {

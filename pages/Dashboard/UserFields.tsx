@@ -6,9 +6,11 @@ import {
   getDetailedManagementPlan, 
   getCompanionCropAdvisory,
   getPrecisionCropMatch,
+  getSoilToCropDiagnostic,
   SoilInsight,
   CompanionAdvisory,
-  PrecisionCropMatch
+  PrecisionCropMatch,
+  SoilCropDiagnostic
 } from '../../services/gemini';
 import { syncFields, syncSensorsFromDb, addFieldToDb } from '../../services/db';
 
@@ -26,6 +28,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [soilInsight, setSoilInsight] = useState<SoilInsight | null>(null);
   const [companionAdvisory, setCompanionAdvisory] = useState<CompanionAdvisory | null>(null);
   const [precisionMatch, setPrecisionMatch] = useState<PrecisionCropMatch | null>(null);
+  const [soilDiagnostic, setSoilDiagnostic] = useState<SoilCropDiagnostic | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentDataState, setCurrentDataState] = useState<any>(null);
@@ -50,6 +53,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setSoilInsight(null);
     setCompanionAdvisory(null);
     setPrecisionMatch(null);
+    setSoilDiagnostic(null);
     setManagementPlan(null);
     
     try {
@@ -70,12 +74,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      const [analysis, insight, plan, companion, precision] = await Promise.all([
+      const [analysis, insight, plan, companion, precision, diagnostic] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
         getDetailedManagementPlan(field, stats),
         getCompanionCropAdvisory(field, stats),
-        getPrecisionCropMatch(field, stats)
+        getPrecisionCropMatch(field, stats),
+        getSoilToCropDiagnostic(field, stats)
       ]);
       
       setRecommendations(analysis);
@@ -83,6 +88,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setManagementPlan(plan);
       setCompanionAdvisory(companion);
       setPrecisionMatch(precision);
+      setSoilDiagnostic(diagnostic);
     } catch (err) {
       console.error("Critical AI node error", err);
     } finally {
@@ -217,38 +223,37 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                       </div>
 
-                      {/* Sensor-to-Crop Matcher (NEW TASK) */}
-                      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group">
-                        <div className="absolute -right-8 -top-8 opacity-10 text-8xl group-hover:scale-110 transition-transform">
-                          <i className="fas fa-crosshairs"></i>
+                      {/* Soil-to-Crop Diagnostic (NEW MODULE) */}
+                      <div className="bg-emerald-600 p-8 rounded-[2.5rem] text-white shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group">
+                        <div className="absolute -right-8 -top-8 opacity-20 text-8xl group-hover:scale-110 transition-transform">
+                          <i className="fas fa-microscope"></i>
                         </div>
                         <h3 className="font-black text-xl mb-6 flex items-center gap-3">
-                          <i className="fas fa-bullseye text-emerald-400"></i> Sensor Compatibility
+                          <i className="fas fa-clipboard-check text-emerald-200"></i> AI Suitability Diagnostic
                         </h3>
-                        {precisionMatch ? (
+                        {soilDiagnostic ? (
                           <div className="space-y-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-[10px] font-black uppercase text-emerald-200">Confidence Index</span>
+                              <span className="text-2xl font-black">{soilDiagnostic.suitability_index}%</span>
+                            </div>
+                            <div className="p-4 bg-white/10 rounded-2xl border border-white/10">
+                              <div className="text-[8px] font-black uppercase text-emerald-100 mb-1">Biological Logic</div>
+                              <p className="text-[11px] leading-relaxed font-medium">{soilDiagnostic.logic}</p>
+                            </div>
                             <div>
-                              <div className="text-[8px] font-black uppercase text-slate-400 mb-1">Precision Bio-Match</div>
-                              <div className="font-black text-2xl text-emerald-400">{precisionMatch.best_crop}</div>
+                              <div className="text-[8px] font-black uppercase text-emerald-100 mb-1">Nutrient Constraints</div>
+                              <p className="text-[11px] text-emerald-50 italic">{soilDiagnostic.nutrient_limitation}</p>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${precisionMatch.match_probability}%` }}></div>
-                              </div>
-                              <span className="text-[10px] font-bold text-emerald-400">{precisionMatch.match_probability}%</span>
-                            </div>
-                            <p className="text-[10px] text-slate-300 leading-relaxed italic border-l-2 border-emerald-500 pl-3">
-                              {precisionMatch.biological_advantage}
-                            </p>
-                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                              <div className="text-[7px] font-black uppercase tracking-widest text-slate-500">Key Driver</div>
-                              <div className="text-[11px] font-bold text-slate-300">{precisionMatch.critical_metric}</div>
+                            <div className="mt-2 text-right">
+                              <div className="text-[8px] font-black uppercase text-emerald-200 mb-1">Top Cultivar</div>
+                              <div className="text-sm font-black tracking-tight">{soilDiagnostic.suggested_variety}</div>
                             </div>
                           </div>
                         ) : (
-                          <div className="py-10 text-center opacity-30">
-                            <i className="fas fa-atom fa-spin text-2xl mb-2"></i>
-                            <p className="text-[10px] font-black uppercase">Sequencing Telemetry...</p>
+                          <div className="py-12 text-center opacity-30">
+                            <i className="fas fa-dna fa-spin text-2xl mb-2"></i>
+                            <p className="text-[10px] font-black uppercase">Diagnosing Soil Synergy...</p>
                           </div>
                         )}
                       </div>
