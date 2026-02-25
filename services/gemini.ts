@@ -93,6 +93,14 @@ const formatDataForPrompt = (data: any) => {
     
     FIELD CONTEXT: ${data.field_name} at ${data.location}, Soil Type: ${data.soil_type || 'Loamy'}.
     
+    REFERENCE KNOWLEDGE (BARI & Kaggle):
+    - Clay/Clayey + High Moisture -> Rice / Jute
+    - Black Soil -> Cotton / Linseed / Wheat
+    - Sandy Soil -> Watermelon / Groundnut
+    - Acidic Peaty Soil (pH < 5.5) -> Boro Rice
+    - High Nitrogen (N > 80) -> Wheat / Maize
+    - Alluvial Soil -> Sugarcane / Mustard
+    
     IMPORTANT: You MUST NOT invent data for categories marked as [MISSING]. If a category is missing, do not include it in the restoration strategy; instead, briefly note that a sensor is required for that metric.
   `;
 };
