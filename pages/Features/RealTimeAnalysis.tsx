@@ -25,7 +25,7 @@ const RealTimeAnalysis: React.FC = () => {
             <h4 className="text-xl font-bold text-slate-900 mb-4">Nyquist-Shannon Theorem</h4>
             <p className="text-slate-600 leading-relaxed mb-6">To accurately reconstruct a field condition signal, our sampling frequency must be at least twice the highest frequency component of the environmental change.</p>
             <div className="text-xl font-mono text-emerald-700 bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
-              f<sub>s</sub> > 2 × f<sub>max</sub>
+              f<sub>s</sub> {'>'} 2 × f<sub>max</sub>
             </div>
           </div>
           <img src="https://images.unsplash.com/photo-1551288049-bbbda540d70a?q=80&w=1200&auto=format&fit=crop" className="rounded-3xl shadow-xl border-8 border-white" alt="Data Chart" />
