@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Field, CropRecommendation } from "../types";
+import { Field, CropRecommendation, SensorData } from "../types";
 
 /**
  * Multi-Key Rotation System
@@ -13,7 +13,7 @@ class RotatingAIProvider {
 
   constructor() {
     this.keys = [
-      process.env.API_KEY,
+      process.env.GEMINI_API_KEY,
       (process as any).env.API_KEY_2,
       (process as any).env.API_KEY_3
     ].filter(k => k && k.length > 5) as string[];
@@ -57,7 +57,7 @@ class RotatingAIProvider {
 const aiProvider = new RotatingAIProvider();
 
 export const isAiReady = async () => {
-  return !!process.env.API_KEY;
+  return !!process.env.GEMINI_API_KEY;
 };
 
 const cleanAndParseJSON = (text: string | undefined) => {
@@ -70,10 +70,12 @@ const cleanAndParseJSON = (text: string | undefined) => {
   }
 };
 
+type AnalysisData = Partial<SensorData> & { soil_type?: string; field_name?: string; location?: string };
+
 /**
  * Enhanced Telemetry Context with "Missing" Awareness
  */
-const formatDataForPrompt = (data: any) => {
+const formatDataForPrompt = (data: AnalysisData) => {
   const format = (key: string, label: string, unit: string = '') => {
     const val = data[key];
     if (val === undefined || val === null) return `${label}: [MISSING - SENSOR NOT REGISTERED]`;
@@ -93,27 +95,20 @@ const formatDataForPrompt = (data: any) => {
     
     FIELD CONTEXT: ${data.field_name} at ${data.location}, Soil Type: ${data.soil_type || 'Loamy'}.
     
-    AI MODEL ARCHITECTURE: Random Forest Agricultural Intelligence (RFAI-2.5)
-    - Trained on 6,000+ BARI & Kaggle soil-crop intersections.
-    - Deterministic output mode enabled (Consistency: 100%).
-    - Decision Tree Logic:
-      * Clay/Clayey + High Moisture -> Rice / Jute / Sugarcane
-      * Black Soil -> Cotton / Linseed / Wheat
-      * Sandy Soil -> Watermelon / Groundnut / Potato
-      * Acidic Peaty Soil (pH < 5.5) -> Boro Rice / Rice / Jute
-      * High Nitrogen (N > 80) -> Wheat / Maize / Soyabean
-      * Alluvial Soil -> Sugarcane / Mustard / Jute
+    AI MODEL ARCHITECTURE: Real-Time Agricultural Intelligence (RTAI-2.5)
+    - Dynamic Reasoning: Analyze the unique intersection of pH, Moisture, NPK, Temperature, and Soil Type.
+    - Real-Time Synthesis: Generate crop suggestions based on current environmental conditions, not fixed templates.
+    - Global Knowledge: Use your extensive agricultural database to find the most compatible crops for the specific telemetry provided.
     
-    IMPORTANT: You are the model. Provide consistent, static-like suggestions for the same input parameters. Do not invent data for [MISSING] sensors.
+    IMPORTANT: You are the model. Provide highly specific, data-driven suggestions. Do not invent data for [MISSING] sensors. If a sensor is missing, adapt your reasoning accordingly.
   `;
 };
 
-const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
-const DETERMINISTIC_CONFIG = {
-  seed: 42,
-  temperature: 0,
-  topP: 1,
-  topK: 1
+const MODEL_NAME = 'gemini-2.5-flash-preview-12-2025';
+const DYNAMIC_CONFIG = {
+  temperature: 0.7,
+  topP: 0.9,
+  topK: 40
 };
 
 export interface SoilInsight {
@@ -134,13 +129,13 @@ export interface ManagementPrescription {
   };
 }
 
-export const getCropAnalysis = async (field: Field, latestData: any): Promise<CropRecommendation[]> => {
+export const getCropAnalysis = async (field: Field, latestData: AnalysisData): Promise<CropRecommendation[]> => {
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Suggest 3 best crops based on your internal Random Forest logic. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Suggest 3 best crops by cross-referencing all available telemetry (pH, Moisture, NPK, Temp, Soil). ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        ...DETERMINISTIC_CONFIG,
+        ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -161,17 +156,18 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
     });
     return cleanAndParseJSON(response.text) || getFallbackCrops(latestData);
   } catch (error) {
+    console.error("AI Analysis failed, using fallback", error);
     return getFallbackCrops(latestData);
   }
 };
 
-export const getSoilHealthSummary = async (field: Field, latestData: any): Promise<SoilInsight> => {
+export const getSoilHealthSummary = async (field: Field, latestData: AnalysisData): Promise<SoilInsight> => {
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Provide Soil Restoration Strategy. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Provide a Soil Restoration Strategy based on the full sensor profile. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        ...DETERMINISTIC_CONFIG,
+        ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -189,13 +185,13 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
   }
 };
 
-export const getManagementPrescriptions = async (field: Field, latestData: any): Promise<ManagementPrescription> => {
+export const getManagementPrescriptions = async (field: Field, latestData: AnalysisData): Promise<ManagementPrescription> => {
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Create management prescriptions. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Create management prescriptions by analyzing the intersection of all sensor data. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        ...DETERMINISTIC_CONFIG,
+        ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -239,13 +235,13 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   }
 };
 
-export const getDetailedManagementPlan = async (field: Field, latestData: any) => {
+export const getDetailedManagementPlan = async (field: Field, latestData: AnalysisData) => {
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Build a 4-step Operational Roadmap. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Build a 4-step Operational Roadmap tailored to the current environmental telemetry. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
-        ...DETERMINISTIC_CONFIG,
+        ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -270,16 +266,35 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
 
 // --- DYNAMIC DATA-AWARE FALLBACKS ---
 
-const getFallbackCrops = (data: any): CropRecommendation[] => {
+const getFallbackCrops = (data: AnalysisData): CropRecommendation[] => {
   const isDry = data.moisture !== undefined && data.moisture < 20;
+  const isAcidic = data.ph_level !== undefined && data.ph_level < 5.5;
+  const soil = data.soil_type?.toLowerCase() || 'loamy';
+
+  if (soil.includes('sandy')) {
+    return [
+      { name: "Watermelon", suitability: 92, yield: "25t/ha", requirements: "Thrives in sandy soil.", fertilizer: "Potash", icon: "fa-lemon" },
+      { name: "Groundnut", suitability: 85, yield: "2.5t/ha", requirements: "Good drainage.", fertilizer: "Gypsum", icon: "fa-nut-bolt" },
+      { name: "Potato", suitability: 78, yield: "20t/ha", requirements: "Loose soil needed.", fertilizer: "NPK", icon: "fa-potato" }
+    ];
+  }
+
+  if (soil.includes('clay')) {
+    return [
+      { name: "Rice", suitability: 95, yield: "6.5t/ha", requirements: "Water retention is key.", fertilizer: "Urea", icon: "fa-bowl-rice" },
+      { name: "Jute", suitability: 88, yield: "2.8t/ha", requirements: "High humidity.", fertilizer: "Organic", icon: "fa-leaf" },
+      { name: "Sugarcane", suitability: 82, yield: "80t/ha", requirements: "Long growth cycle.", fertilizer: "DAP", icon: "fa-cane" }
+    ];
+  }
+
   return [
     { name: isDry ? "Millets" : "Hybrid Rice", suitability: 90, yield: isDry ? "2.0t/ha" : "7.5t/ha", requirements: "Resilient to current profile.", fertilizer: "Urea", icon: "fa-wheat-awn" },
-    { name: "Potato", suitability: 82, yield: "22t/ha", requirements: "Needs loose soil.", fertilizer: "MOP", icon: "fa-potato" },
-    { name: "Eggplant", suitability: 75, yield: "18t/ha", requirements: "High Nitrogen needs.", fertilizer: "Organic", icon: "fa-seedling" }
+    { name: isAcidic ? "Boro Rice" : "Potato", suitability: 82, yield: "22t/ha", requirements: "Adjusted for pH.", fertilizer: "MOP", icon: "fa-potato" },
+    { name: "Maize", suitability: 75, yield: "18t/ha", requirements: "Versatile crop.", fertilizer: "Organic", icon: "fa-seedling" }
   ];
 };
 
-const getFallbackSoilInsight = (data: any): SoilInsight => {
+const getFallbackSoilInsight = (data: AnalysisData): SoilInsight => {
   const hasMoisture = data.moisture !== undefined;
   const isDry = hasMoisture && data.moisture < 20;
   return {
@@ -290,7 +305,7 @@ const getFallbackSoilInsight = (data: any): SoilInsight => {
   };
 };
 
-const getFallbackPrescription = (data: any): ManagementPrescription => {
+const getFallbackPrescription = (data: AnalysisData): ManagementPrescription => {
   const isDry = data.moisture !== undefined && data.moisture < 20;
   return {
     irrigation: { needed: isDry, volume: isDry ? "12,000L/ha" : "Monitoring", schedule: "Pre-dawn" },
@@ -298,7 +313,7 @@ const getFallbackPrescription = (data: any): ManagementPrescription => {
   };
 };
 
-const getFallbackPlan = (data: any) => {
+const getFallbackPlan = (data: AnalysisData) => {
   const roadmap = [];
   if (data.moisture !== undefined) roadmap.push({ priority: "HIGH", title: "Moisture Balance", description: "Correcting water volume based on FDR sensor.", icon: "fa-droplet" });
   if (data.ph_level !== undefined) roadmap.push({ priority: "MEDIUM", title: "pH Correction", description: "Neutralizing soil based on probe data.", icon: "fa-scale-balanced" });
