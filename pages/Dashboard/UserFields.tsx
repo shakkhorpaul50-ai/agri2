@@ -318,6 +318,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <option value="Loamy">Loamy</option>
                     <option value="Clay">Clay</option>
                     <option value="Sandy">Sandy</option>
+                    <option value="Alluvial">Alluvial</option>
+                    <option value="Peaty">Peaty</option>
+                    <option value="Black">Black</option>
+                    <option value="Red">Red</option>
+                    <option value="Silty">Silty</option>
+                    <option value="Clayey">Clayey</option>
                   </select>
                 </div>
               </div>
