@@ -2,12 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { User, Field } from '../../types';
 import { syncFields, syncSensorsFromDb } from '../../services/db';
-import { getManagementPrescriptions, ManagementPrescription } from '../../services/gemini';
+import { getManagementPrescriptions, ManagementPrescription, getCropAnalysis } from '../../services/gemini';
+import { CropRecommendation } from '../../types';
 
 interface FieldWithAI extends ManagementPrescription {
   field: Field;
   data: any;
   aiLoading: boolean;
+  recommendations: CropRecommendation[];
 }
 
 const Management: React.FC<{ user: User }> = ({ user }) => {
@@ -46,6 +48,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
               field: f,
               data: stats,
               aiLoading: true,
+              recommendations: [],
               irrigation: { needed: false, volume: '...', schedule: '...' },
               nutrient: { needed: false, fertilizers: [], advice: '...' }
             };
@@ -54,14 +57,23 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
           setFieldData(initialData);
           setLoading(false);
 
-          // Trigger AI prescriptions
+          // Trigger AI prescriptions and recommendations
           initialData.forEach(async (item, index) => {
             try {
-              const prescriptions = await getManagementPrescriptions(item.field, item.data);
+              const [prescriptions, recommendations] = await Promise.all([
+                getManagementPrescriptions(item.field, item.data),
+                getCropAnalysis(item.field, item.data)
+              ]);
+
               setFieldData(prev => {
                 const updated = [...prev];
                 if (updated[index]) {
-                  updated[index] = { ...updated[index], ...prescriptions, aiLoading: false };
+                  updated[index] = { 
+                    ...updated[index], 
+                    ...prescriptions, 
+                    recommendations,
+                    aiLoading: false 
+                  };
                 }
                 return updated;
               });
@@ -244,6 +256,41 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                     ) : (
                       <p className="text-xs text-slate-500 font-medium">N-P-K concentration balance established.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Harvest Compatibility Index Section */}
+                <div className="px-8 pb-8">
+                  <div className="bg-slate-900 rounded-[2rem] p-6 text-white">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="font-black uppercase text-xs tracking-[0.2em] text-emerald-400">Harvest Compatibility Index</h4>
+                      <div className="text-[10px] font-bold text-slate-500">BARI & KAGGLE DATASET SYNC</div>
+                    </div>
+                    
+                    {aiLoading ? (
+                      <div className="flex gap-4">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className="flex-1 h-24 bg-white/5 rounded-2xl animate-pulse"></div>
+                        ))}
+                      </div>
+                    ) : item.recommendations.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {item.recommendations.map((rec, i) => (
+                          <div key={i} className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-colors group">
+                            <div className="flex items-center justify-between mb-3">
+                              <i className={`fas ${rec.icon || 'fa-seedling'} text-emerald-400`}></i>
+                              <span className="text-[10px] font-black text-emerald-500">{rec.suitability}% Match</span>
+                            </div>
+                            <div className="font-bold text-sm mb-1">{rec.name}</div>
+                            <div className="text-[10px] text-slate-400 line-clamp-2 group-hover:line-clamp-none transition-all">{rec.requirements}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-slate-500 text-xs italic">
+                        Awaiting sensor stabilization for compatibility indexing...
+                      </div>
                     )}
                   </div>
                 </div>

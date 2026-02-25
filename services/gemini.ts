@@ -129,7 +129,7 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Suggest 3 crops based ONLY on available telemetry. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Generate a "Harvest Compatibility Index" suggesting 3 best crops based ONLY on available telemetry. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
