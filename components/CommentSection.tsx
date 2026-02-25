@@ -1,59 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { DbService, Review } from '../services/db';
+
+import React, { useState } from 'react';
+
+interface Comment {
+  id: number;
+  name: string;
+  rating: number;
+  text: string;
+  date: string;
+}
 
 const CommentSection: React.FC = () => {
-  const [comments, setComments] = useState<Review[]>([]);
+  const [comments, setComments] = useState<Comment[]>([
+    { id: 1, name: "Abdur Rashid", rating: 5, text: "The management alerts are a game changer. I knew exactly when to irrigate my Bogura potato field.", date: "2 days ago" },
+    { id: 2, name: "Fatema Begum", rating: 4, text: "Great tool for fertilizer calculation. Saved me a lot of money on over-fertilizing during the rainy season.", date: "1 week ago" }
+  ]);
   const [newComment, setNewComment] = useState("");
   const [rating, setRating] = useState(5);
   const [userName, setUserName] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        const data = await DbService.getReviews();
-        setComments(data);
-      } catch (e) {
-        console.error("Failed to load reviews:", e);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchReviews();
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment || !userName || isSubmitting) return;
+    if (!newComment || !userName) return;
     
-    setIsSubmitting(true);
-    const timestamp = Date.now();
-    const reviewData: Review = {
-      id: `review_${timestamp}_${Math.floor(Math.random() * 1000)}`,
+    const comment: Comment = {
+      id: Date.now(),
       name: userName,
       rating,
       text: newComment,
-      date: "Just now",
-      createdAt: timestamp
+      date: "Just now"
     };
     
-    try {
-      await DbService.saveReview(reviewData);
-      // Refresh list
-      const updatedData = await DbService.getReviews();
-      setComments(updatedData);
-      
-      // Reset form
-      setNewComment("");
-      setUserName("");
-      setRating(5);
-    } catch (err: any) {
-      console.error("Review Submission Error Detail:", err);
-      alert(`Failed to submit review: ${err.message || 'Unknown error'}. Please check if Firestore is configured with open rules or authenticated access.`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    setComments([comment, ...comments]);
+    setNewComment("");
+    setUserName("");
+    setRating(5);
   };
 
   return (
@@ -64,31 +44,29 @@ const CommentSection: React.FC = () => {
           <p className="text-slate-500">Share your experience with the Agricare platform.</p>
         </div>
 
-        {/* Form Styled to Match User Screenshot */}
-        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-10 mb-16">
-          <h3 className="text-2xl font-bold mb-8 text-slate-900">Leave a Review</h3>
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 mb-12">
+          <h3 className="text-xl font-bold mb-6">Leave a Review</h3>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-bold text-slate-800 mb-3">Your Name</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Your Name</label>
                 <input 
                   type="text" 
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  className="w-full px-5 py-4 rounded-xl bg-[#3f3f3f] text-slate-200 border-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500 font-medium" 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" 
                   placeholder="e.g. Kamal Hossain"
-                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-800 mb-3">Rating</label>
-                <div className="flex gap-2 mt-1">
+                <label className="block text-sm font-bold text-slate-700 mb-2">Rating</label>
+                <div className="flex gap-2 mt-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
                       onClick={() => setRating(star)}
-                      className={`text-3xl transition-transform hover:scale-110 ${star <= rating ? 'text-yellow-400' : 'text-slate-200'}`}
+                      className={`text-2xl transition-colors ${star <= rating ? 'text-yellow-400' : 'text-slate-200'}`}
                     >
                       <i className="fas fa-star"></i>
                     </button>
@@ -97,52 +75,36 @@ const CommentSection: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-3">Your Comments</label>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Your Comments</label>
               <textarea 
                 rows={4}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="w-full px-5 py-4 rounded-xl bg-[#3f3f3f] text-slate-200 border-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500 font-medium resize-none"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                 placeholder="How has Agricare helped your farm in Bangladesh?"
-                required
               ></textarea>
             </div>
-            <button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="bg-[#049364] text-white px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#037d55] transition-all shadow-xl shadow-emerald-900/10 active:scale-95 disabled:opacity-50"
-            >
-              {isSubmitting ? 'SUBMITTING...' : 'Submit Review'}
+            <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
+              Submit Review
             </button>
           </form>
         </div>
 
         <div className="space-y-6">
-          <h3 className="text-xl font-bold text-slate-800 px-2 mb-4">Latest Feedback</h3>
-          {isLoading ? (
-            <div className="flex justify-center py-10">
-              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : comments.length > 0 ? (
-            comments.map((c) => (
-              <div key={c.id} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow animate-in fade-in slide-in-from-bottom-4">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="font-bold text-slate-900 text-lg">{c.name}</div>
-                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{c.date === "Just now" ? c.date : new Date(c.createdAt).toLocaleDateString()}</div>
-                  </div>
-                  <div className="flex gap-1 text-yellow-400 text-sm">
-                    {[...Array(c.rating)].map((_, i) => <i key={i} className="fas fa-star"></i>)}
-                  </div>
+          {comments.map((c) => (
+            <div key={c.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-bottom-4">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="font-bold text-slate-900">{c.name}</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{c.date}</div>
                 </div>
-                <p className="text-slate-600 text-base leading-relaxed italic">"{c.text}"</p>
+                <div className="flex gap-1 text-yellow-400 text-sm">
+                  {[...Array(c.rating)].map((_, i) => <i key={i} className="fas fa-star"></i>)}
+                </div>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-10 text-slate-400 font-medium">
-              No reviews yet. Be the first to share your experience!
+              <p className="text-slate-600 text-sm leading-relaxed italic">"{c.text}"</p>
             </div>
-          )}
+          ))}
         </div>
       </div>
     </section>

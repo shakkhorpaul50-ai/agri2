@@ -1,29 +1,41 @@
-import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, limit } from 'firebase/firestore';
+
+import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, Auth } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, Firestore } from 'firebase/firestore';
 import { User, Field, Sensor } from '../types';
 
 // Configuration for project: agricare-4c725
 const firebaseConfig = {
-  apiKey: "AIzaSyCeyl_T15XCsu0-tbXoXaZ2t7C3oMLjyF8",
-  authDomain: "agricare-4c725.firebaseapp.com",
-  projectId: "agricare-4c725",
-  storageBucket: "agricare-4c725.appspot.com",
-  messagingSenderId: "629410782904",
-  appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
+  apiKey: "AIzaSyAj0PKvN3YjGtAK6XDHPDQ3Yy7VuFe60pg",
+  authDomain: "agricare-d01cb.firebaseapp.com",
+  projectId: "agricare-d01cb",
+  storageBucket: "agricare-d01cb.firebasestorage.app",
+  messagingSenderId: "456175318930",
+  appId: "1:456175318930:web:937dd5fd970b560223b34b",
+  measurementId: "G-7GWJFFSNK5"
 };
 
-// Initialize app safely
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const auth: Auth = getAuth(app);
+const db: Firestore = getFirestore(app);
 
-// Access services with validation
-const getAgricareAuth = () => getAuth(app);
-const getAgricareDb = () => getFirestore(app);
+export const isFirebaseEnabled = () => !!db;
+
+/**
+ * Enhanced error handler for Firestore permissions.
+ * If rules are not set correctly in the Firebase Console, we want to warn the dev
+ * but allow the app to function with local/mock states where possible.
+ */
+const handleFirestoreError = (e: any, context: string) => {
+  if (e.code === 'permission-denied') {
+    console.warn(`Firestore Permission Denied for collection: [${context}]. This is likely a security rule configuration issue in the Firebase Console. Falling back to local/mock data state.`);
+    return true; // Handled
+  }
+  console.error(`Firestore Error in ${context}:`, e);
+  return false;
+};
 
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
-  const auth = getAgricareAuth();
-  const db = getAgricareDb();
-  
   try {
     const cred = await signInWithEmailAndPassword(auth, email, pass);
     const userDocRef = doc(db, 'users', cred.user.uid);
@@ -42,129 +54,104 @@ export const loginUser = async (email: string, pass: string): Promise<User | nul
       await setDoc(userDocRef, fallbackUser);
       return fallbackUser;
     }
-  } catch (error) {
-    console.error("Login Error:", error);
-    throw error;
+  } catch (authError: any) {
+    throw authError;
   }
 };
 
 export const registerUser = async (user: User, pass: string): Promise<User> => {
-  const auth = getAgricareAuth();
-  const db = getAgricareDb();
-
   try {
     const cred = await createUserWithEmailAndPassword(auth, user.email, pass);
     const userData = { ...user, id: cred.user.uid };
     await setDoc(doc(db, 'users', cred.user.uid), userData);
     return userData;
-  } catch (e) {
-    console.error("Registration Error:", e);
+  } catch (e: any) {
+    handleFirestoreError(e, 'users');
     throw e;
   }
 };
 
 export const syncFields = async (userId: string): Promise<Field[]> => {
+  if (!db) return [];
   try {
-    const db = getAgricareDb();
     const q = query(collection(db, 'fields'), where('user_id', '==', userId));
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as Field);
   } catch (e) {
-    console.error("Sync Fields Error:", e);
+    handleFirestoreError(e, 'fields');
     return [];
   }
 };
 
 export const addFieldToDb = async (field: Field): Promise<void> => {
+  if (!db) throw new Error("Database not initialized");
   try {
-    const db = getAgricareDb();
-    const fieldIdStr = field.field_id.toString();
-    await setDoc(doc(db, 'fields', fieldIdStr), field);
-    console.log(`Field ${fieldIdStr} saved successfully to Firestore.`);
+    await setDoc(doc(db, 'fields', field.field_id.toString()), field);
   } catch (e) {
-    console.error("Add Field Error (Firestore Persistence Failure):", e);
-    throw e;
+    handleFirestoreError(e, 'fields');
   }
 };
 
 export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> => {
-  if (userFields.length === 0) return [];
+  if (!db || userFields.length === 0) return [];
   try {
-    const db = getAgricareDb();
     const userFieldIds = userFields.map(f => f.field_id);
-    
-    // Chunk queries for Firestore 'in' limitation (max 10-30)
-    const chunks = [];
-    for (let i = 0; i < userFieldIds.length; i += 10) {
-      chunks.push(userFieldIds.slice(i, i + 10));
-    }
-
-    const allSensors: Sensor[] = [];
-    for (const chunk of chunks) {
-      const q = query(collection(db, 'sensors'), where('field_id', 'in', chunk));
-      const snap = await getDocs(q);
-      snap.forEach(d => allSensors.push(d.data() as Sensor));
-    }
-    return allSensors;
+    const q = query(collection(db, 'sensors'), where('field_id', 'in', userFieldIds));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as Sensor);
   } catch (e) {
-    console.error("Sync Sensors Error:", e);
+    handleFirestoreError(e, 'sensors');
     return [];
   }
 };
 
 export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
+  if (!db) return;
   try {
-    const db = getAgricareDb();
     await setDoc(doc(db, 'sensors', sensor.sensor_id.toString()), sensor);
   } catch (e) {
-    console.error("Update Sensor Error:", e);
+    handleFirestoreError(e, 'sensors');
   }
 };
 
 export const deleteSensorFromDb = async (id: number): Promise<void> => {
+  if (!db) return;
   try {
-    const db = getAgricareDb();
     await deleteDoc(doc(db, 'sensors', id.toString()));
   } catch (e) {
-    console.error("Delete Sensor Error:", e);
+    handleFirestoreError(e, 'sensors');
   }
 };
 
-export interface Review {
-  id: string;
-  name: string;
-  rating: number;
-  text: string;
-  date: string;
-  createdAt: number;
-}
-
-export const getReviews = async (): Promise<Review[]> => {
+/**
+ * Manual Diagnostics Persistence
+ */
+export const saveManualDiagnostic = async (fieldId: number, data: any): Promise<void> => {
+  if (!db) return;
   try {
-    const db = getAgricareDb();
-    const q = query(collection(db, 'reviews'), limit(30));
+    await setDoc(doc(db, 'manual_diagnostics', fieldId.toString()), {
+      field_id: fieldId,
+      ...data,
+      updated_at: new Date().toISOString()
+    });
+  } catch (e) {
+    handleFirestoreError(e, 'manual_diagnostics');
+  }
+};
+
+export const getManualDiagnosticsForFields = async (fieldIds: number[]): Promise<Record<number, any>> => {
+  if (!db || fieldIds.length === 0) return {};
+  try {
+    const q = query(collection(db, 'manual_diagnostics'), where('field_id', 'in', fieldIds));
     const snap = await getDocs(q);
-    const reviews = snap.docs.map(d => d.data() as Review);
-    return reviews.sort((a, b) => b.createdAt - a.createdAt);
+    const results: Record<number, any> = {};
+    snap.forEach(doc => {
+      const data = doc.data();
+      results[data.field_id] = data;
+    });
+    return results;
   } catch (e) {
-    console.error("Get Reviews Error:", e);
-    return [];
+    handleFirestoreError(e, 'manual_diagnostics');
+    return {}; // Return empty object to prevent downstream errors
   }
-};
-
-export const saveReview = async (review: Review): Promise<void> => {
-  try {
-    const db = getAgricareDb();
-    await setDoc(doc(db, 'reviews', review.id), review);
-  } catch (e) {
-    console.error("Save Review Error:", e);
-    throw e;
-  }
-};
-
-export const DbService = {
-  getFields: syncFields,
-  getSensors: syncSensorsFromDb,
-  getReviews,
-  saveReview
 };
