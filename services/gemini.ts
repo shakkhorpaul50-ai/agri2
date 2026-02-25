@@ -93,13 +93,15 @@ const formatDataForPrompt = (data: any) => {
     
     FIELD CONTEXT: ${data.field_name} at ${data.location}, Soil Type: ${data.soil_type || 'Loamy'}.
     
-    REFERENCE KNOWLEDGE (BARI & Kaggle):
-    - Clay/Clayey + High Moisture -> Rice / Jute
+    REFERENCE KNOWLEDGE (BARI & Kaggle - 6,000+ Record Sync):
+    - The datasets now contain 6,000 unique combinations of pH, Moisture, and NPK.
+    - Each combination in the dataset suggests at least 3 compatible crops.
+    - Clay/Clayey + High Moisture -> Rice / Jute / Sugarcane
     - Black Soil -> Cotton / Linseed / Wheat
-    - Sandy Soil -> Watermelon / Groundnut
-    - Acidic Peaty Soil (pH < 5.5) -> Boro Rice
-    - High Nitrogen (N > 80) -> Wheat / Maize
-    - Alluvial Soil -> Sugarcane / Mustard
+    - Sandy Soil -> Watermelon / Groundnut / Potato
+    - Acidic Peaty Soil (pH < 5.5) -> Boro Rice / Rice / Jute
+    - High Nitrogen (N > 80) -> Wheat / Maize / Soyabean
+    - Alluvial Soil -> Sugarcane / Mustard / Jute
     
     IMPORTANT: You MUST NOT invent data for categories marked as [MISSING]. If a category is missing, do not include it in the restoration strategy; instead, briefly note that a sensor is required for that metric.
   `;
