@@ -14,6 +14,7 @@ class RotatingAIProvider {
   constructor() {
     this.keys = [
       process.env.GEMINI_API_KEY,
+      process.env.API_KEY,
       (process as any).env.API_KEY_2,
       (process as any).env.API_KEY_3
     ].filter(k => k && k.length > 5) as string[];
@@ -57,7 +58,7 @@ class RotatingAIProvider {
 const aiProvider = new RotatingAIProvider();
 
 export const isAiReady = async () => {
-  return !!process.env.GEMINI_API_KEY;
+  return !!(process.env.GEMINI_API_KEY || process.env.API_KEY);
 };
 
 const cleanAndParseJSON = (text: string | undefined) => {
@@ -77,36 +78,40 @@ type AnalysisData = Partial<SensorData> & { soil_type?: string; field_name?: str
  */
 const formatDataForPrompt = (data: AnalysisData) => {
   const format = (key: string, label: string, unit: string = '') => {
-    const val = data[key];
-    if (val === undefined || val === null) return `${label}: [MISSING - SENSOR NOT REGISTERED]`;
+    const val = (data as any)[key];
+    if (val === undefined || val === null) return `${label}: [MISSING]`;
     return `${label}: ${Number(val).toFixed(2)}${unit}`;
   };
 
   const npkStatus = (data.npk_n !== undefined) 
-    ? `Nitrogen=${data.npk_n}, Phosphorus=${data.npk_p}, Potassium=${data.npk_k}` 
-    : "[MISSING - NPK ANALYZER NOT REGISTERED]";
+    ? `N=${data.npk_n}, P=${data.npk_p}, K=${data.npk_k}` 
+    : "[MISSING]";
 
   return `
-    [INSTALLED SENSOR PILLARS]
-    1. MOISTURE: ${format('moisture', 'Current Reading', '%')}
-    2. pH LEVEL: ${format('ph_level', 'Current Reading')}
-    3. NPK PROFILE: ${npkStatus}
-    4. TEMPERATURE: ${format('temperature', 'Current Reading', '°C')}
+    [FIELD TELEMETRY]
+    - SOIL TYPE: ${data.soil_type || 'Unknown'}
+    - MOISTURE: ${format('moisture', 'Value', '%')}
+    - pH LEVEL: ${format('ph_level', 'Value')}
+    - NPK (N-P-K): ${npkStatus}
+    - TEMPERATURE: ${format('temperature', 'Value', '°C')}
     
-    FIELD CONTEXT: ${data.field_name} at ${data.location}, Soil Type: ${data.soil_type || 'Loamy'}.
+    [AGRICULTURAL KNOWLEDGE BASE (BARI & KAGGLE SYNC)]
+    You must synthesize recommendations by cross-referencing the telemetry against these established patterns:
+    1. RICE/BORO RICE: Requires high moisture (60-95%) and clay/peaty soil. Boro rice prefers acidic pH (4-6).
+    2. WHEAT/MAIZE: Prefers loamy/alluvial soil with moderate moisture (30-70%). Wheat needs Nitrogen > 60.
+    3. COTTON/LINSEED: Thrives in Black soil with lower moisture (20-50%) and slightly alkaline pH (7-8.5).
+    4. WATERMELON/GROUNDNUT: Best in Sandy/Red soil with low-to-moderate moisture (10-50%).
+    5. POTATO: Needs Loamy/Sandy soil, acidic-to-neutral pH (5.5-6.5), and high Potassium (K > 70).
+    6. JUTE/SUGARCANE: Requires Alluvial/Silty soil and high moisture (60-95%).
+    7. MILLETS/PULSES: Drought-resistant, works in Red/Black soil with low moisture (10-40%).
     
-    AI MODEL ARCHITECTURE: Real-Time Agricultural Intelligence (RTAI-2.5)
-    - Dynamic Reasoning: Analyze the unique intersection of pH, Moisture, NPK, Temperature, and Soil Type.
-    - Real-Time Synthesis: Generate crop suggestions based on current environmental conditions, not fixed templates.
-    - Global Knowledge: Use your extensive agricultural database to find the most compatible crops for the specific telemetry provided.
-    
-    IMPORTANT: You are the model. Provide highly specific, data-driven suggestions. Do not invent data for [MISSING] sensors. If a sensor is missing, adapt your reasoning accordingly.
+    INSTRUCTION: You are a real-time Agricultural Expert System. Analyze the [FIELD TELEMETRY] and provide 3 specific crop suggestions. Do not use generic placeholders. If a sensor is [MISSING], state that the recommendation is limited by missing data but still provide the best possible guess based on Soil Type.
   `;
 };
 
-const MODEL_NAME = 'gemini-2.5-flash-preview-12-2025';
+const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
 const DYNAMIC_CONFIG = {
-  temperature: 0.7,
+  temperature: 0.4,
   topP: 0.9,
   topK: 40
 };
@@ -267,60 +272,27 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Analys
 // --- DYNAMIC DATA-AWARE FALLBACKS ---
 
 const getFallbackCrops = (data: AnalysisData): CropRecommendation[] => {
-  const isDry = data.moisture !== undefined && data.moisture < 20;
-  const isAcidic = data.ph_level !== undefined && data.ph_level < 5.5;
-  const soil = data.soil_type?.toLowerCase() || 'loamy';
-
-  if (soil.includes('sandy')) {
-    return [
-      { name: "Watermelon", suitability: 92, yield: "25t/ha", requirements: "Thrives in sandy soil.", fertilizer: "Potash", icon: "fa-lemon" },
-      { name: "Groundnut", suitability: 85, yield: "2.5t/ha", requirements: "Good drainage.", fertilizer: "Gypsum", icon: "fa-nut-bolt" },
-      { name: "Potato", suitability: 78, yield: "20t/ha", requirements: "Loose soil needed.", fertilizer: "NPK", icon: "fa-potato" }
-    ];
-  }
-
-  if (soil.includes('clay')) {
-    return [
-      { name: "Rice", suitability: 95, yield: "6.5t/ha", requirements: "Water retention is key.", fertilizer: "Urea", icon: "fa-bowl-rice" },
-      { name: "Jute", suitability: 88, yield: "2.8t/ha", requirements: "High humidity.", fertilizer: "Organic", icon: "fa-leaf" },
-      { name: "Sugarcane", suitability: 82, yield: "80t/ha", requirements: "Long growth cycle.", fertilizer: "DAP", icon: "fa-cane" }
-    ];
-  }
-
   return [
-    { name: isDry ? "Millets" : "Hybrid Rice", suitability: 90, yield: isDry ? "2.0t/ha" : "7.5t/ha", requirements: "Resilient to current profile.", fertilizer: "Urea", icon: "fa-wheat-awn" },
-    { name: isAcidic ? "Boro Rice" : "Potato", suitability: 82, yield: "22t/ha", requirements: "Adjusted for pH.", fertilizer: "MOP", icon: "fa-potato" },
-    { name: "Maize", suitability: 75, yield: "18t/ha", requirements: "Versatile crop.", fertilizer: "Organic", icon: "fa-seedling" }
+    { name: "Syncing AI Node...", suitability: 0, yield: "N/A", requirements: "The AI is currently processing your telemetry. Please ensure your API key is active.", fertilizer: "N/A", icon: "fa-spinner" }
   ];
 };
 
 const getFallbackSoilInsight = (data: AnalysisData): SoilInsight => {
-  const hasMoisture = data.moisture !== undefined;
-  const isDry = hasMoisture && data.moisture < 20;
   return {
-    summary: hasMoisture 
-      ? `System diagnostics focusing on ${isDry ? 'water replenishment' : 'soil stability'}.`
-      : "Awaiting primary sensor registration for moisture profiling.",
-    soil_fertilizer: isDry ? "Priority: Drip irrigation cycle." : "Register pH probe for accurate NPK strategy."
+    summary: "AI Node Synchronization in progress...",
+    soil_fertilizer: "Waiting for intelligence synthesis..."
   };
 };
 
 const getFallbackPrescription = (data: AnalysisData): ManagementPrescription => {
-  const isDry = data.moisture !== undefined && data.moisture < 20;
   return {
-    irrigation: { needed: isDry, volume: isDry ? "12,000L/ha" : "Monitoring", schedule: "Pre-dawn" },
-    nutrient: { needed: data.npk_n !== undefined, fertilizers: [], advice: "NPK probe required for prescription." }
+    irrigation: { needed: false, volume: "N/A", schedule: "N/A" },
+    nutrient: { needed: false, fertilizers: [], advice: "N/A" }
   };
 };
 
 const getFallbackPlan = (data: AnalysisData) => {
-  const roadmap = [];
-  if (data.moisture !== undefined) roadmap.push({ priority: "HIGH", title: "Moisture Balance", description: "Correcting water volume based on FDR sensor.", icon: "fa-droplet" });
-  if (data.ph_level !== undefined) roadmap.push({ priority: "MEDIUM", title: "pH Correction", description: "Neutralizing soil based on probe data.", icon: "fa-scale-balanced" });
-  if (data.npk_n !== undefined) roadmap.push({ priority: "MEDIUM", title: "Nutrient Sync", description: "Applying supplement based on NPK analyzer.", icon: "fa-flask" });
-  
-  if (roadmap.length === 0) {
-    roadmap.push({ priority: "URGENT", title: "Sensor Installation", description: "No sensors detected. Please register hardware at the Sensors page.", icon: "fa-satellite-dish" });
-  }
-  return roadmap;
+  return [
+    { priority: "LOW", title: "Awaiting AI", description: "The system is synchronizing with the intelligence node.", icon: "fa-sync" }
+  ];
 };
