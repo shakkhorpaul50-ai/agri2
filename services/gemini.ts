@@ -12,12 +12,13 @@ class RotatingAIProvider {
   private instances: Map<string, any> = new Map();
 
   constructor() {
+    // Prioritize GEMINI_API_KEY as the primary key for this environment
     this.keys = [
       process.env.GEMINI_API_KEY,
-      process.env.API_KEY,
+      (process as any).env.API_KEY,
       (process as any).env.API_KEY_2,
       (process as any).env.API_KEY_3
-    ].filter(k => k && k.length > 5) as string[];
+    ].filter(k => k && typeof k === 'string' && k.length > 5) as string[];
   }
 
   private getClient() {
@@ -109,10 +110,10 @@ const formatDataForPrompt = (data: AnalysisData) => {
   `;
 };
 
-const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
+const MODEL_NAME = 'gemini-2.5-flash-preview-12-2025';
 const DYNAMIC_CONFIG = {
-  temperature: 0.4,
-  topP: 0.9,
+  temperature: 0.3, // Lower temperature for more stable JSON
+  topP: 0.8,
   topK: 40
 };
 
@@ -136,9 +137,10 @@ export interface ManagementPrescription {
 
 export const getCropAnalysis = async (field: Field, latestData: AnalysisData): Promise<CropRecommendation[]> => {
   try {
+    const prompt = `Suggest 3 best crops by cross-referencing all available telemetry (pH, Moisture, NPK, Temp, Soil). ${formatDataForPrompt({...latestData, ...field})}`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Suggest 3 best crops by cross-referencing all available telemetry (pH, Moisture, NPK, Temp, Soil). ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -159,18 +161,23 @@ export const getCropAnalysis = async (field: Field, latestData: AnalysisData): P
         }
       }
     });
-    return cleanAndParseJSON(response.text) || getFallbackCrops(latestData);
+    
+    const text = response.text;
+    if (!text) throw new Error("Empty AI response");
+    
+    return cleanAndParseJSON(text) || getFallbackCrops(latestData);
   } catch (error) {
-    console.error("AI Analysis failed, using fallback", error);
+    console.error("AI Analysis failed:", error);
     return getFallbackCrops(latestData);
   }
 };
 
 export const getSoilHealthSummary = async (field: Field, latestData: AnalysisData): Promise<SoilInsight> => {
   try {
+    const prompt = `Provide a Soil Restoration Strategy based on the full sensor profile. ${formatDataForPrompt({...latestData, ...field})}`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Provide a Soil Restoration Strategy based on the full sensor profile. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -184,17 +191,20 @@ export const getSoilHealthSummary = async (field: Field, latestData: AnalysisDat
         }
       }
     });
-    return cleanAndParseJSON(response.text) || getFallbackSoilInsight(latestData);
+    const text = response.text;
+    return cleanAndParseJSON(text) || getFallbackSoilInsight(latestData);
   } catch (error) {
+    console.error("Soil analysis failed:", error);
     return getFallbackSoilInsight(latestData);
   }
 };
 
 export const getManagementPrescriptions = async (field: Field, latestData: AnalysisData): Promise<ManagementPrescription> => {
   try {
+    const prompt = `Create management prescriptions by analyzing the intersection of all sensor data. ${formatDataForPrompt({...latestData, ...field})}`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Create management prescriptions by analyzing the intersection of all sensor data. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -234,17 +244,20 @@ export const getManagementPrescriptions = async (field: Field, latestData: Analy
         }
       }
     });
-    return cleanAndParseJSON(response.text) || getFallbackPrescription(latestData);
+    const text = response.text;
+    return cleanAndParseJSON(text) || getFallbackPrescription(latestData);
   } catch (error) {
+    console.error("Prescription failed:", error);
     return getFallbackPrescription(latestData);
   }
 };
 
 export const getDetailedManagementPlan = async (field: Field, latestData: AnalysisData) => {
   try {
+    const prompt = `Build a 4-step Operational Roadmap tailored to the current environmental telemetry. ${formatDataForPrompt({...latestData, ...field})}`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Build a 4-step Operational Roadmap tailored to the current environmental telemetry. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -263,8 +276,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Analys
         }
       }
     });
-    return cleanAndParseJSON(response.text) || getFallbackPlan(latestData);
+    const text = response.text;
+    return cleanAndParseJSON(text) || getFallbackPlan(latestData);
   } catch (error) {
+    console.error("Roadmap failed:", error);
     return getFallbackPlan(latestData);
   }
 };
