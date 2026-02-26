@@ -12,14 +12,27 @@ class RotatingAIProvider {
   private instances: Map<string, any> = new Map();
 
   constructor() {
-    // Collect all possible keys from the environment
-    const envKeys = [
-      process.env.GEMINI_API_KEY,
-      (process as any).env.API_KEY,
-      (process as any).env.VITE_GEMINI_API_KEY
-    ].filter(k => k && typeof k === 'string' && k.length > 10);
+    const keys: string[] = [];
+    try {
+      // Safely collect keys from various possible environment locations
+      const possibleKeys = [
+        process.env.GEMINI_API_KEY,
+        (process as any).env.API_KEY,
+        (process as any).env.VITE_GEMINI_API_KEY,
+        (process as any).env.API_KEY_2,
+        (process as any).env.API_KEY_3
+      ];
+      
+      possibleKeys.forEach(k => {
+        if (k && typeof k === 'string' && k.length > 5) {
+          keys.push(k);
+        }
+      });
+    } catch (e) {
+      console.warn("Environment access restricted:", e);
+    }
     
-    this.keys = Array.from(new Set(envKeys)) as string[];
+    this.keys = Array.from(new Set(keys));
   }
 
   private getClient() {
@@ -111,10 +124,10 @@ const formatDataForPrompt = (data: AnalysisData) => {
   `;
 };
 
-const MODEL_NAME = 'gemini-3-flash-preview';
+const MODEL_NAME = 'gemini-2.5-flash';
 const DYNAMIC_CONFIG = {
-  temperature: 0.2, // Very low for high reliability in JSON structure
-  topP: 0.8,
+  temperature: 0.1, // Low temperature for better JSON formatting
+  topP: 0.95,
   topK: 40
 };
 
@@ -138,32 +151,19 @@ export interface ManagementPrescription {
 
 export const getCropAnalysis = async (field: Field, latestData: AnalysisData): Promise<CropRecommendation[]> => {
   try {
-    const prompt = `Suggest 3 best crops based on this telemetry: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY a JSON array.`;
+    const prompt = `Suggest 3 best crops based on this telemetry: ${formatDataForPrompt({...latestData, ...field})}. 
+    Return the result as a raw JSON array of objects with these fields: name (string), suitability (number 0-100), yield (string), requirements (string), fertilizer (string), icon (string).
+    Do not include any markdown formatting or explanations. Just the JSON array.`;
+    
     const response = await aiProvider.generate({
       model: MODEL_NAME,
       contents: prompt,
-      config: {
-        ...DYNAMIC_CONFIG,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              suitability: { type: Type.NUMBER },
-              yield: { type: Type.STRING },
-              requirements: { type: Type.STRING },
-              fertilizer: { type: Type.STRING },
-              icon: { type: Type.STRING }
-            },
-            required: ["name", "suitability", "yield", "requirements", "fertilizer", "icon"]
-          }
-        }
-      }
+      config: DYNAMIC_CONFIG
     });
     
-    return cleanAndParseJSON(response.text) || getFallbackCrops(latestData);
+    const text = response.text;
+    console.log("AI Raw Response (Crops):", text);
+    return cleanAndParseJSON(text) || getFallbackCrops(latestData);
   } catch (error) {
     console.error("Crop Analysis Error:", error);
     return getFallbackCrops(latestData);
@@ -172,22 +172,14 @@ export const getCropAnalysis = async (field: Field, latestData: AnalysisData): P
 
 export const getSoilHealthSummary = async (field: Field, latestData: AnalysisData): Promise<SoilInsight> => {
   try {
-    const prompt = `Provide Soil Restoration Strategy for: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY JSON.`;
+    const prompt = `Provide Soil Restoration Strategy for: ${formatDataForPrompt({...latestData, ...field})}. 
+    Return as a raw JSON object with fields: summary (string), soil_fertilizer (string).
+    No markdown, just raw JSON.`;
+    
     const response = await aiProvider.generate({
       model: MODEL_NAME,
       contents: prompt,
-      config: {
-        ...DYNAMIC_CONFIG,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            summary: { type: Type.STRING },
-            soil_fertilizer: { type: Type.STRING }
-          },
-          required: ["summary", "soil_fertilizer"]
-        }
-      }
+      config: DYNAMIC_CONFIG
     });
     return cleanAndParseJSON(response.text) || getFallbackSoilInsight(latestData);
   } catch (error) {
@@ -198,48 +190,14 @@ export const getSoilHealthSummary = async (field: Field, latestData: AnalysisDat
 
 export const getManagementPrescriptions = async (field: Field, latestData: AnalysisData): Promise<ManagementPrescription> => {
   try {
-    const prompt = `Create management prescriptions for: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY JSON.`;
+    const prompt = `Create management prescriptions for: ${formatDataForPrompt({...latestData, ...field})}. 
+    Return as a raw JSON object with fields: irrigation (object with needed:boolean, volume:string, schedule:string), nutrient (object with needed:boolean, fertilizers:array of {type:string, amount:string}, advice:string).
+    No markdown, just raw JSON.`;
+    
     const response = await aiProvider.generate({
       model: MODEL_NAME,
       contents: prompt,
-      config: {
-        ...DYNAMIC_CONFIG,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            irrigation: {
-              type: Type.OBJECT,
-              properties: {
-                needed: { type: Type.BOOLEAN },
-                volume: { type: Type.STRING },
-                schedule: { type: Type.STRING }
-              },
-              required: ["needed", "volume", "schedule"]
-            },
-            nutrient: {
-              type: Type.OBJECT,
-              properties: {
-                needed: { type: Type.BOOLEAN },
-                fertilizers: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      type: { type: Type.STRING },
-                      amount: { type: Type.STRING }
-                    },
-                    required: ["type", "amount"]
-                  }
-                },
-                advice: { type: Type.STRING }
-              },
-              required: ["needed", "fertilizers", "advice"]
-            }
-          },
-          required: ["irrigation", "nutrient"]
-        }
-      }
+      config: DYNAMIC_CONFIG
     });
     return cleanAndParseJSON(response.text) || getFallbackPrescription(latestData);
   } catch (error) {
@@ -250,27 +208,14 @@ export const getManagementPrescriptions = async (field: Field, latestData: Analy
 
 export const getDetailedManagementPlan = async (field: Field, latestData: AnalysisData) => {
   try {
-    const prompt = `Build a 4-step Operational Roadmap for: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY JSON.`;
+    const prompt = `Build a 4-step Operational Roadmap for: ${formatDataForPrompt({...latestData, ...field})}. 
+    Return as a raw JSON array of objects with fields: priority (string), title (string), description (string), icon (string).
+    No markdown, just raw JSON.`;
+    
     const response = await aiProvider.generate({
       model: MODEL_NAME,
       contents: prompt,
-      config: {
-        ...DYNAMIC_CONFIG,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              priority: { type: Type.STRING },
-              title: { type: Type.STRING },
-              description: { type: Type.STRING },
-              icon: { type: Type.STRING }
-            },
-            required: ["priority", "title", "description", "icon"]
-          }
-        }
-      }
+      config: DYNAMIC_CONFIG
     });
     return cleanAndParseJSON(response.text) || getFallbackPlan(latestData);
   } catch (error) {
