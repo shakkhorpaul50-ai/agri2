@@ -12,13 +12,14 @@ class RotatingAIProvider {
   private instances: Map<string, any> = new Map();
 
   constructor() {
-    // Prioritize GEMINI_API_KEY as the primary key for this environment
-    this.keys = [
+    // Collect all possible keys from the environment
+    const envKeys = [
       process.env.GEMINI_API_KEY,
       (process as any).env.API_KEY,
-      (process as any).env.API_KEY_2,
-      (process as any).env.API_KEY_3
-    ].filter(k => k && typeof k === 'string' && k.length > 5) as string[];
+      (process as any).env.VITE_GEMINI_API_KEY
+    ].filter(k => k && typeof k === 'string' && k.length > 10);
+    
+    this.keys = Array.from(new Set(envKeys)) as string[];
   }
 
   private getClient() {
@@ -110,9 +111,9 @@ const formatDataForPrompt = (data: AnalysisData) => {
   `;
 };
 
-const MODEL_NAME = 'gemini-2.5-flash-preview-12-2025';
+const MODEL_NAME = 'gemini-3-flash-preview';
 const DYNAMIC_CONFIG = {
-  temperature: 0.3, // Lower temperature for more stable JSON
+  temperature: 0.2, // Very low for high reliability in JSON structure
   topP: 0.8,
   topK: 40
 };
@@ -137,10 +138,10 @@ export interface ManagementPrescription {
 
 export const getCropAnalysis = async (field: Field, latestData: AnalysisData): Promise<CropRecommendation[]> => {
   try {
-    const prompt = `Suggest 3 best crops by cross-referencing all available telemetry (pH, Moisture, NPK, Temp, Soil). ${formatDataForPrompt({...latestData, ...field})}`;
+    const prompt = `Suggest 3 best crops based on this telemetry: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY a JSON array.`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -162,22 +163,19 @@ export const getCropAnalysis = async (field: Field, latestData: AnalysisData): P
       }
     });
     
-    const text = response.text;
-    if (!text) throw new Error("Empty AI response");
-    
-    return cleanAndParseJSON(text) || getFallbackCrops(latestData);
+    return cleanAndParseJSON(response.text) || getFallbackCrops(latestData);
   } catch (error) {
-    console.error("AI Analysis failed:", error);
+    console.error("Crop Analysis Error:", error);
     return getFallbackCrops(latestData);
   }
 };
 
 export const getSoilHealthSummary = async (field: Field, latestData: AnalysisData): Promise<SoilInsight> => {
   try {
-    const prompt = `Provide a Soil Restoration Strategy based on the full sensor profile. ${formatDataForPrompt({...latestData, ...field})}`;
+    const prompt = `Provide Soil Restoration Strategy for: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY JSON.`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -191,20 +189,19 @@ export const getSoilHealthSummary = async (field: Field, latestData: AnalysisDat
         }
       }
     });
-    const text = response.text;
-    return cleanAndParseJSON(text) || getFallbackSoilInsight(latestData);
+    return cleanAndParseJSON(response.text) || getFallbackSoilInsight(latestData);
   } catch (error) {
-    console.error("Soil analysis failed:", error);
+    console.error("Soil Health Error:", error);
     return getFallbackSoilInsight(latestData);
   }
 };
 
 export const getManagementPrescriptions = async (field: Field, latestData: AnalysisData): Promise<ManagementPrescription> => {
   try {
-    const prompt = `Create management prescriptions by analyzing the intersection of all sensor data. ${formatDataForPrompt({...latestData, ...field})}`;
+    const prompt = `Create management prescriptions for: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY JSON.`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -244,20 +241,19 @@ export const getManagementPrescriptions = async (field: Field, latestData: Analy
         }
       }
     });
-    const text = response.text;
-    return cleanAndParseJSON(text) || getFallbackPrescription(latestData);
+    return cleanAndParseJSON(response.text) || getFallbackPrescription(latestData);
   } catch (error) {
-    console.error("Prescription failed:", error);
+    console.error("Prescription Error:", error);
     return getFallbackPrescription(latestData);
   }
 };
 
 export const getDetailedManagementPlan = async (field: Field, latestData: AnalysisData) => {
   try {
-    const prompt = `Build a 4-step Operational Roadmap tailored to the current environmental telemetry. ${formatDataForPrompt({...latestData, ...field})}`;
+    const prompt = `Build a 4-step Operational Roadmap for: ${formatDataForPrompt({...latestData, ...field})}. Return ONLY JSON.`;
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -276,10 +272,9 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Analys
         }
       }
     });
-    const text = response.text;
-    return cleanAndParseJSON(text) || getFallbackPlan(latestData);
+    return cleanAndParseJSON(response.text) || getFallbackPlan(latestData);
   } catch (error) {
-    console.error("Roadmap failed:", error);
+    console.error("Management Plan Error:", error);
     return getFallbackPlan(latestData);
   }
 };
