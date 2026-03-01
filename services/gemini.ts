@@ -130,12 +130,11 @@ const formatDataForPrompt = (data: AnalysisData) => {
   `;
 };
 
-const MODEL_NAME = 'gemini-2.5-flash-preview';
+const MODEL_NAME = 'gemini-flash-lite-latest';
 const DYNAMIC_CONFIG = {
   temperature: 0.1, 
   topP: 0.95,
-  topK: 40,
-  thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+  topK: 40
 };
 
 export interface SoilInsight {
