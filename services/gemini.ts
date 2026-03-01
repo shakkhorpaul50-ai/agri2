@@ -1,10 +1,11 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { Field, CropRecommendation, SensorData } from "../types";
 
 /**
  * Multi-Key Rotation System
  * Cycles through up to 3 keys from environment variables.
+ * Optimized for Free Tier rate limits.
  */
 class RotatingAIProvider {
   private keys: string[];
@@ -14,8 +15,6 @@ class RotatingAIProvider {
   constructor() {
     const keys: string[] = [];
     try {
-      // Safely collect keys from various possible environment locations
-      // We filter out "undefined" and "null" strings which can be injected by build tools
       const possibleKeys = [
         process.env.GEMINI_API_KEY,
         (process as any).env.API_KEY,
@@ -35,15 +34,13 @@ class RotatingAIProvider {
     
     this.keys = Array.from(new Set(keys));
     if (this.keys.length === 0) {
-      console.error("CRITICAL: No valid Gemini API keys found in environment. AI features will be disabled.");
-    } else {
-      console.log(`AI Provider initialized with ${this.keys.length} keys.`);
+      console.error("CRITICAL: No valid Gemini API keys found. AI features will be disabled.");
     }
   }
 
   private getClient() {
     if (this.keys.length === 0) {
-      throw new Error("No API keys configured. Ensure process.env.API_KEY is defined.");
+      throw new Error("No API keys configured.");
     }
     const key = this.keys[this.currentIndex];
     if (!this.instances.has(key)) {
@@ -58,7 +55,7 @@ class RotatingAIProvider {
     }
   }
 
-  async generate(params: any, retries = 2): Promise<any> {
+  async generate(params: any, retries = 3): Promise<any> {
     try {
       const ai = this.getClient();
       return await ai.models.generateContent(params);
@@ -68,7 +65,10 @@ class RotatingAIProvider {
       
       if (isRetryable && retries > 0) {
         this.rotate();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Exponential backoff for free tier: 2s, 4s, 8s
+        const delay = Math.pow(2, 4 - retries) * 1000;
+        console.warn(`Rate limit hit. Retrying in ${delay}ms with key rotation...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         return this.generate(params, retries - 1);
       }
       throw error;
@@ -132,9 +132,10 @@ const formatDataForPrompt = (data: AnalysisData) => {
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 const DYNAMIC_CONFIG = {
-  temperature: 0.1, // Low temperature for consistent JSON
+  temperature: 0.1, 
   topP: 0.95,
-  topK: 40
+  topK: 40,
+  thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
 };
 
 export interface SoilInsight {
