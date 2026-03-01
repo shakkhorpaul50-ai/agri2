@@ -130,7 +130,7 @@ const formatDataForPrompt = (data: AnalysisData) => {
   `;
 };
 
-const MODEL_NAME = 'gemini-3-flash-preview';
+const MODEL_NAME = 'gemini-2.5-flash-preview';
 const DYNAMIC_CONFIG = {
   temperature: 0.1, 
   topP: 0.95,
