@@ -15,6 +15,7 @@ class RotatingAIProvider {
     const keys: string[] = [];
     try {
       // Safely collect keys from various possible environment locations
+      // We filter out "undefined" and "null" strings which can be injected by build tools
       const possibleKeys = [
         process.env.GEMINI_API_KEY,
         (process as any).env.API_KEY,
@@ -24,7 +25,7 @@ class RotatingAIProvider {
       ];
       
       possibleKeys.forEach(k => {
-        if (k && typeof k === 'string' && k.length > 5) {
+        if (k && typeof k === 'string' && k.length > 10 && k !== "undefined" && k !== "null") {
           keys.push(k);
         }
       });
@@ -33,6 +34,11 @@ class RotatingAIProvider {
     }
     
     this.keys = Array.from(new Set(keys));
+    if (this.keys.length === 0) {
+      console.error("CRITICAL: No valid Gemini API keys found in environment. AI features will be disabled.");
+    } else {
+      console.log(`AI Provider initialized with ${this.keys.length} keys.`);
+    }
   }
 
   private getClient() {
@@ -156,7 +162,7 @@ export const getCropAnalysis = async (field: Field, latestData: AnalysisData): P
     
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -179,7 +185,6 @@ export const getCropAnalysis = async (field: Field, latestData: AnalysisData): P
     });
     
     const text = response.text;
-    console.log("AI Raw Response (Crops):", text);
     return cleanAndParseJSON(text) || getFallbackCrops(latestData);
   } catch (error) {
     console.error("Crop Analysis Error:", error);
@@ -193,7 +198,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: AnalysisDat
     
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -220,7 +225,7 @@ export const getManagementPrescriptions = async (field: Field, latestData: Analy
     
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",
@@ -273,7 +278,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Analys
     
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: prompt,
       config: {
         ...DYNAMIC_CONFIG,
         responseMimeType: "application/json",

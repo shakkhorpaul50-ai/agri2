@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Field, Sensor } from '../../types';
-import { syncFields, syncSensorsFromDb, addOrUpdateSensorInDb, deleteSensorFromDb } from '../../services/db';
+import { User, Field, Sensor } from '@/types';
+import { syncFields, syncSensorsFromDb, addOrUpdateSensorInDb, deleteSensorFromDb } from '@/services/db';
 
 const Sensors: React.FC<{ user: User }> = ({ user }) => {
   const [userFields, setUserFields] = useState<Field[]>([]);

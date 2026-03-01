@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Field, CropRecommendation } from '../../types';
+import { User, Field, CropRecommendation } from '@/types';
 import { 
   getCropAnalysis, 
   getSoilHealthSummary, 
   getDetailedManagementPlan, 
   SoilInsight
-} from '../../services/gemini';
-import { syncFields, syncSensorsFromDb, addFieldToDb } from '../../services/db';
+} from '@/services/gemini';
+import { syncFields, syncSensorsFromDb, addFieldToDb } from '@/services/db';
 
 interface ManagementTask {
   priority: string;

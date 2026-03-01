@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Field } from '../../types';
-import { syncFields, syncSensorsFromDb } from '../../services/db';
-import { getManagementPrescriptions, ManagementPrescription, getCropAnalysis } from '../../services/gemini';
-import { CropRecommendation } from '../../types';
+import { User, Field } from '@/types';
+import { syncFields, syncSensorsFromDb } from '@/services/db';
+import { getManagementPrescriptions, ManagementPrescription, getCropAnalysis } from '@/services/gemini';
+import { CropRecommendation } from '@/types';
 
 interface FieldWithAI extends ManagementPrescription {
   field: Field;
