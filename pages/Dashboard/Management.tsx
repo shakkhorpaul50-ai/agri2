@@ -312,10 +312,10 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
               <i className="fas fa-brain text-emerald-400"></i> AI Advisory Context
             </h3>
             <div className="space-y-6 text-sm text-slate-400">
-              <p>The Gemini 2.5 Flash engine analyzes registered sensor data to prevent resource waste.</p>
+              <p>The Agricare Intelligence engine analyzes registered sensor data using Kaggle & BARI agricultural datasets.</p>
               <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
                 <i className="fas fa-info-circle text-emerald-400 mr-2"></i>
-                If a metric is missing, the AI defaults to "Safety First" monitoring mode.
+                If a metric is missing, the system defaults to "Safety First" monitoring mode.
               </div>
             </div>
             <button 

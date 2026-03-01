@@ -55,3 +55,21 @@ export interface CropRecommendation {
   fertilizer: string;
   icon: string;
 }
+
+export interface SoilInsight {
+  summary: string;
+  soil_fertilizer: string;
+}
+
+export interface ManagementPrescription {
+  irrigation: {
+    needed: boolean;
+    volume: string;
+    schedule: string;
+  };
+  nutrient: {
+    needed: boolean;
+    fertilizers: { type: string; amount: string }[];
+    advice: string;
+  };
+}
